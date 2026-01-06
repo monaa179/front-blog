@@ -95,10 +95,10 @@
                   v-if="canWrite(article.status)"
                   class="btn btn-primary btn-sm btn-write" 
                   @click="handleWrite(article)"
-                  :disabled="processingId === article.id || article.status === 'writing'"
+                  :disabled="processingId === article.id"
                 >
-                  <div v-if="processingId === article.id || article.status === 'writing'" class="loader-sm"></div>
-                  <span>{{ (processingId === article.id || article.status === 'writing') ? 'Redaction...' : 'Rédiger' }}</span>
+                  <div v-if="processingId === article.id" class="loader-sm"></div>
+                  <span>{{ (processingId === article.id) ? 'Redaction...' : 'Rédiger' }}</span>
                 </button>
 
                 <!-- Copy Button (if written) -->
@@ -245,38 +245,53 @@ const canWrite = (status: string) => {
 }
 
 const handleWrite = async (article: any) => {
-  if (article.status === 'writing' || processingId.value === article.id) return 
-  
+  // Note: we intentionally avoid returning early here so the fetch is always attempted
+  // Button disabled state (via processingId) prevents double clicks from the UI.
+
+  console.debug('[handleWrite] clicked for article', article?.id)
+
+  // Mark as processing to disable the button in the UI
   processingId.value = article.id
-  
+
   try {
-    // Statut passe immédiatement à writing
+    console.debug('[handleWrite] setting status -> writing (local + db) for', article.id)
+    // Update status locally and in Supabase to show immediate feedback
     await updateStatus(article.id, 'writing')
-    
-    const response = await $fetch('/api/trigger-make', {
+
+    // Call Make webhook to trigger the external drafting automation
+    const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q'
+
+    console.debug('[handleWrite] calling webhook', makeWebhook, 'payload:', { article_id: article.id })
+
+    const res = await fetch(makeWebhook, {
       method: 'POST',
-      body: {
-        article_id: article.id,
-        original_title: article.original_title,
-        original_description: article.original_description,
-        source_url: article.source_url,
-        modules: article.modules.map((m: any) => ({ 
-            id: m.id,
-            name: m.name,
-            slug: m.slug 
-        }))
-      }
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ article_id: article.id })
     })
-    
-    // We expect Make to update the status to 'written' once done.
-    // For now we just poll or rely on the user refreshing.
-    // But as per requirements: "En cas d'erreur: Statut passe à error"
-    // The response from trigger-make is handled in the catch block if it fails.
-    
+
+    console.debug('[handleWrite] webhook response status', res.status)
+
+    if (!res.ok) {
+      // If Make returns non-2xx, mark the article as error so user can retry
+      console.error('[handleWrite] Make webhook responded with non-ok status', res.status)
+      await updateStatus(article.id, 'error')
+    } else {
+      console.debug('[handleWrite] webhook called successfully for', article.id)
+      // leave status as 'writing' so server/workflow can update to 'written' when done
+    }
+
   } catch (e) {
-    console.error('Error triggering write', e)
-    await updateStatus(article.id, 'error')
+    console.error('[handleWrite] Error triggering write for', article.id, e)
+    // Roll back status to error so user can see and retry
+    try {
+      await updateStatus(article.id, 'error')
+    } catch (innerErr) {
+      console.error('[handleWrite] failed to rollback status for', article.id, innerErr)
+    }
   } finally {
+    // Always clear processing flag so button becomes active again
     processingId.value = null
   }
 }
