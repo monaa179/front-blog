@@ -13,9 +13,9 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
           Dashboard
         </NuxtLink>
-        <NuxtLink to="/dashboard" class="nav-item">
+        <NuxtLink to="/library" class="nav-item">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          Articles
+          Bibliothèque
         </NuxtLink>
         <NuxtLink to="/modules" class="nav-item">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
@@ -25,8 +25,13 @@
 
       <div class="sidebar-footer">
         <div class="user-info" v-if="user">
-          <div class="avatar">{{ user.email?.charAt(0).toUpperCase() }}</div>
-          <span class="email">{{ user.email }}</span>
+          <div class="user-details">
+            <div class="avatar">{{ user.email?.charAt(0).toUpperCase() }}</div>
+            <span class="email" :title="user.email">{{ user.email }}</span>
+          </div>
+          <button class="logout-btn" @click="handleLogout" title="Déconnexion">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
         </div>
       </div>
     </aside>
@@ -38,7 +43,18 @@
 </template>
 
 <script setup lang="ts">
+const client = useSupabaseClient()
 const user = useSupabaseUser()
+const router = useRouter()
+
+const handleLogout = async () => {
+  const { error } = await client.auth.signOut()
+  if (error) {
+    console.error('Logout error:', error)
+  } else {
+    router.push('/login')
+  }
+}
 </script>
 
 <style scoped>
@@ -123,7 +139,16 @@ const user = useSupabaseUser()
 .user-info {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+
+.user-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  flex: 1;
 }
 
 .avatar {
@@ -138,6 +163,7 @@ const user = useSupabaseUser()
   font-size: 10px;
   font-weight: 600;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .email {
@@ -146,6 +172,26 @@ const user = useSupabaseUser()
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border-color: var(--color-error);
 }
 
 .main-content {

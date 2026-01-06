@@ -26,39 +26,42 @@
 
         <section class="versions-section">
           <div class="versions-header">
-            <h3>Generated Content</h3>
+            <h3>Contenu Rédigé</h3>
             <div class="version-tabs" v-if="versions.length > 0">
               <button 
-                v-for="ver in versions" 
+                v-for="(ver, index) in versions" 
                 :key="ver.id"
                 class="version-tab"
-                :class="{ active: selectedVersion?.id === ver.id }"
+                :class="{ active: selectedVersion?.id === ver.id, latest: index === 0 }"
                 @click="selectedVersion = ver"
               >
                 v{{ ver.version_number }}
+                <span v-if="index === 0" class="latest-badge">(Récent)</span>
               </button>
             </div>
           </div>
 
           <div v-if="versions.length === 0" class="empty-state">
             <div class="empty-icon">✍️</div>
-            <h4>No content generated yet</h4>
-            <p>Click "Rédiger" on the dashboard to generate the first draft.</p>
+            <h4>Aucun contenu généré pour le moment</h4>
+            <p>Cliquez sur "Rédiger" depuis le dashboard pour lancer la génération.</p>
           </div>
 
           <div v-else-if="selectedVersion" class="version-viewer">
              <div class="viewer-toolbar">
                <span class="version-timestamp">
                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                 {{ formatDate(selectedVersion.created_at) }}
+                 Rédigé le {{ formatDate(selectedVersion.created_at) }}
                </span>
-               <button class="btn btn-outline btn-sm copy-btn" @click="copyContent">
+               <button class="btn btn-primary btn-sm copy-btn" @click="copyContent">
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                 Copy Markdown
+                 Copier le Markdown
                </button>
              </div>
              <div class="markdown-body">
-               {{ selectedVersion.content }}
+               <div class="article-content-txt">
+                 {{ selectedVersion.content }}
+               </div>
              </div>
           </div>
         </section>
@@ -152,13 +155,13 @@ const fetchData = async () => {
     .select('*')
     .eq('article_id', articleId)
     .order('version_number', { ascending: false })
-    .limit(5)
 
   if (versionsError) {
     console.error('Error loading versions', versionsError)
   } else {
     versions.value = versionsData || []
     if (versions.value.length > 0) {
+      // Latest version is the one with the highest version_number (first in the list due to order)
       selectedVersion.value = versions.value[0]
     }
   }
@@ -266,10 +269,21 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.version-tab.latest {
+  border-left: 2px solid var(--primary);
+}
+
+.latest-badge {
+  font-size: 10px;
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
 .version-tab.active {
   background: var(--bg-card-hover);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+  border-color: var(--border-active);
 }
 
 .version-viewer {
@@ -277,21 +291,22 @@ onMounted(() => {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-md);
 }
 
 .viewer-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 12px 24px;
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-sidebar); /* Slightly darker/lighter header */
+  background: var(--bg-sidebar);
 }
 
 .version-timestamp {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
   color: var(--text-secondary);
 }
@@ -299,17 +314,23 @@ onMounted(() => {
 .copy-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  font-weight: 600;
 }
 
 .markdown-body {
-  padding: 40px;
-  font-family: 'Inter', sans-serif; /* Or a specialized serif/sans read font */
+  padding: 48px;
+  font-family: 'Inter', sans-serif;
   font-size: 16px;
-  line-height: 1.7;
+  line-height: 1.8;
   color: var(--text-primary);
+  background-color: var(--bg-dark); /* Contrast for reader mode */
+}
+
+.article-content-txt {
   white-space: pre-wrap;
-  min-height: 400px;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .empty-state {

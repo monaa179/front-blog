@@ -2,8 +2,8 @@
   <div class="dashboard-page">
     <div class="page-header">
       <div class="header-text">
-        <h1>Recent Articles</h1>
-        <p class="subtitle">Overview of your content pipeline.</p>
+        <h1>Dashboard</h1>
+        <p class="subtitle">Vue d'ensemble de votre pipeline de contenu.</p>
       </div>
       <div class="header-actions">
         <!-- Future: Filters or global actions -->
@@ -12,7 +12,7 @@
 
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <span>Loading articles...</span>
+      <span>Chargement des articles...</span>
     </div>
 
     <div v-else-if="error" class="error-msg">
@@ -24,20 +24,26 @@
       <table class="articles-table">
         <thead>
           <tr>
-            <th style="width: 25%">Article</th>
+            <th style="width: 20%">Titre</th>
             <th style="width: 20%">Description</th>
-            <th style="width: 50px; text-align: center;">Link</th>
-            <th style="width: 140px">Status</th>
-            <th style="width: 20%">Modules</th>
-            <th style="width: 120px; text-align: right;">Action</th>
+            <th style="width: 50px; text-align: center;">URL</th>
+            <th style="width: 130px">Statut</th>
+            <th style="width: 140px">Modules</th>
+            <th style="width: 100px">Date</th>
+            <th style="width: 160px; text-align: right;">Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="article in articles" :key="article.id" class="article-row">
+          <tr 
+            v-for="article in articles" 
+            :key="article.id" 
+            class="article-row" 
+            :class="{ clickable: ['written', 'validated', 'published'].includes(article.status) }"
+            @click="handleRowClick(article)"
+          >
             <td>
               <div class="article-info">
                 <div class="article-title" :title="article.original_title">{{ article.original_title }}</div>
-                <span class="article-date">{{ formatDate(article.created_at) }}</span>
               </div>
             </td>
             <td>
@@ -45,7 +51,7 @@
                 {{ article.original_description || '—' }}
               </div>
             </td>
-            <td class="text-center">
+            <td class="text-center" @click.stop>
               <a 
                 v-if="article.source_url" 
                 :href="article.source_url" 
@@ -53,11 +59,11 @@
                 class="source-link-icon"
                 title="Open Source URL"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
               </a>
               <span v-else class="text-muted">—</span>
             </td>
-            <td class="status-cell">
+            <td class="status-cell" @click.stop>
               <div class="status-wrapper">
                 <StatusBadge :status="article.status" />
                 <select 
@@ -68,28 +74,51 @@
                   <option v-for="s in filteredStatuses" :key="s" :value="s">{{ s }}</option>
                 </select>
               </div>
+              <div v-if="article.status === 'error'" class="error-indication" title="Une erreur est survenue lors de la rédaction">
+                ⚠️ Erreur
+              </div>
             </td>
-            <td class="modules-cell">
+            <td class="modules-cell" @click.stop>
               <ModuleSelector 
                 :model-value="article.modules" 
                 :available-modules="allModules"
                 @update:model-value="(newModules) => updateModules(article.id, newModules)"
               />
             </td>
-            <td class="text-right">
+            <td>
+              <span class="article-date">{{ formatDate(article.created_at) }}</span>
+            </td>
+            <td class="text-right" @click.stop>
               <div class="actions">
+                <!-- Write Button -->
                 <button 
                   v-if="canWrite(article.status)"
                   class="btn btn-primary btn-sm btn-write" 
-                  @click.stop="handleWrite(article)"
+                  @click="handleWrite(article)"
                   :disabled="processingId === article.id || article.status === 'writing'"
                 >
-                  <span v-if="processingId === article.id">Wait...</span>
-                  <span v-else>Rédiger</span>
+                  <div v-if="processingId === article.id || article.status === 'writing'" class="loader-sm"></div>
+                  <span>{{ (processingId === article.id || article.status === 'writing') ? 'Redaction...' : 'Rédiger' }}</span>
                 </button>
-                <NuxtLink :to="`/articles/${article.id}`" class="btn btn-ghost btn-sm btn-icon-only" title="View Details">
-                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                </NuxtLink>
+
+                <!-- Copy Button (if written) -->
+                <button 
+                  v-if="article.status === 'written' || article.status === 'published' || article.status === 'validated'"
+                  class="btn btn-ghost btn-sm btn-icon-only"
+                  @click="copyLatestVersion(article)"
+                  title="Copier le contenu"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+
+                <!-- Delete Action -->
+                <button 
+                  class="btn btn-ghost btn-sm btn-icon-only text-danger"
+                  @click="deleteArticle(article.id)"
+                  title="Supprimer l'article"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
               </div>
             </td>
           </tr>
@@ -121,7 +150,7 @@ interface Article {
   status: string;
   created_at: string;
   modules: Module[];
-  article_modules?: any[]; // Intermediate for loading
+  last_version_content?: string;
 }
 
 const loading = ref(true)
@@ -136,7 +165,7 @@ const filteredStatuses = statusOptions
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
-  return format(new Date(dateStr), 'MMM dd, HH:mm')
+  return format(new Date(dateStr), 'dd/MM/yyyy')
 }
 
 const fetchModules = async () => {
@@ -147,12 +176,17 @@ const fetchModules = async () => {
 
 const fetchArticles = async () => {
   loading.value = true
+  // Fetch articles with modules and the latest version
   const { data, error: err } = await client
     .from('articles')
     .select(`
       *,
       article_modules (
         module:modules (*)
+      ),
+      article_versions (
+        content,
+        created_at
       )
     `)
     .order('created_at', { ascending: false })
@@ -160,10 +194,19 @@ const fetchArticles = async () => {
   if (err) {
     error.value = err.message
   } else {
-    articles.value = (data as any[]).map(article => ({
-      ...article,
-      modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : []
-    }))
+    articles.value = (data as any[]).map(article => {
+      // Pick the latest version content if available
+      const versions = article.article_versions || []
+      const lastVersion = versions.length > 0 
+        ? versions.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        : null
+
+      return {
+        ...article,
+        modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : [],
+        last_version_content: lastVersion?.content || null
+      }
+    })
   }
   loading.value = false
 }
@@ -202,14 +245,15 @@ const canWrite = (status: string) => {
 }
 
 const handleWrite = async (article: any) => {
-  if (article.status === 'writing') return 
+  if (article.status === 'writing' || processingId.value === article.id) return 
   
   processingId.value = article.id
   
   try {
+    // Statut passe immédiatement à writing
     await updateStatus(article.id, 'writing')
     
-    await $fetch('/api/trigger-make', {
+    const response = await $fetch('/api/trigger-make', {
       method: 'POST',
       body: {
         article_id: article.id,
@@ -223,11 +267,45 @@ const handleWrite = async (article: any) => {
         }))
       }
     })
+    
+    // We expect Make to update the status to 'written' once done.
+    // For now we just poll or rely on the user refreshing.
+    // But as per requirements: "En cas d'erreur: Statut passe à error"
+    // The response from trigger-make is handled in the catch block if it fails.
+    
   } catch (e) {
     console.error('Error triggering write', e)
     await updateStatus(article.id, 'error')
   } finally {
     processingId.value = null
+  }
+}
+
+const handleRowClick = (article: Article) => {
+  const readableStatuses = ['written', 'validated', 'published']
+  if (readableStatuses.includes(article.status)) {
+    router.push(`/articles/${article.id}`)
+  }
+}
+
+const copyLatestVersion = (article: Article) => {
+  if (article.last_version_content) {
+    navigator.clipboard.writeText(article.last_version_content)
+    // Optional: show a toast
+    alert('Contenu copié !')
+  } else {
+    alert('Aucun contenu à copier.')
+  }
+}
+
+const deleteArticle = async (id: number) => {
+  if (!confirm('Supprimer cet article ?')) return
+  
+  const { error: err } = await client.from('articles').delete().eq('id', id)
+  if (err) {
+    alert('Erreur lors de la suppression')
+  } else {
+    articles.value = articles.value.filter(a => a.id !== id)
   }
 }
 
@@ -282,15 +360,13 @@ onMounted(() => {
 
 .article-row {
   background: var(--bg-card);
-  transition: transform 0.1s, box-shadow 0.1s;
+  transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
+  cursor: default;
 }
 
-.article-row td {
-  padding: 16px;
-  border-top: 1px solid var(--border-subtle);
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: middle;
+.article-row.clickable {
+  cursor: pointer;
 }
 
 /* Rounded corners for the row */
@@ -307,9 +383,10 @@ onMounted(() => {
 }
 
 .article-row:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--border-active);
+  background: var(--bg-card-hover);
 }
 
 /* Content Styling */
@@ -322,7 +399,6 @@ onMounted(() => {
   font-weight: 600;
   color: var(--text-primary);
   font-size: 14px;
-  margin-bottom: 4px;
   display: -webkit-box;
   -webkit-line-clamp: 1;
   line-clamp: 1;
@@ -339,8 +415,8 @@ onMounted(() => {
   font-size: 12px;
   color: var(--text-secondary);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   line-height: 1.5;
@@ -348,14 +424,27 @@ onMounted(() => {
 
 .source-link-icon {
   color: var(--text-secondary);
-  padding: 6px;
-  border-radius: 4px;
+  padding: 8px;
+  border-radius: 6px;
   display: inline-flex;
+  background: var(--bg-input);
+  border: 1px solid var(--border-subtle);
 }
 
 .source-link-icon:hover {
-  background: var(--bg-hover);
+  background: var(--bg-card-hover);
   color: var(--primary);
+  border-color: var(--primary);
+}
+
+.error-indication {
+  font-size: 10px;
+  color: var(--color-error);
+  margin-top: 4px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .status-wrapper {
@@ -377,12 +466,27 @@ onMounted(() => {
 .text-center { text-align: center; }
 .text-right { text-align: right; }
 .text-muted { color: var(--text-muted); font-size: 12px; }
+.text-danger { color: var(--color-error); }
 
 .actions {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  gap: 12px;
+}
+
+.btn-write {
+  min-width: 90px;
   gap: 8px;
+}
+
+.loader-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
 
 .btn-icon-only {
@@ -392,20 +496,25 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--border-subtle);
 }
 
 .loading-state, .error-msg {
-  padding: 60px;
+  padding: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
   color: var(--text-secondary);
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-subtle);
+  margin-top: 20px;
 }
 
 .spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid var(--border-active);
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border-active);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 1s infinite linear;

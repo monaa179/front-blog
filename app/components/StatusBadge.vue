@@ -1,8 +1,8 @@
 <template>
-  <span :class="['status-badge', status]">
-    <span class="status-dot"></span>
-    {{ statusLabel }}
-  </span>
+  <div class="status-badge" :class="statusClass">
+    <div class="status-dot"></div>
+    <span>{{ statusLabel }}</span>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -11,30 +11,33 @@ const props = defineProps<{
 }>()
 
 const statusLabel = computed(() => {
-  switch (props.status) {
-    case 'proposed': return 'Proposed'
-    case 'writing': return 'Writing'
-    case 'written': return 'Written'
-    case 'validated': return 'Validated'
-    case 'published': return 'Published'
-    case 'error': return 'Error'
-    case 'abandoned': return 'Abandoned'
-    default: return props.status
+  const map: Record<string, string> = {
+    proposed: 'Proposé',
+    writing: 'Rédaction...',
+    written: 'Rédigé',
+    validated: 'Validé',
+    published: 'Publié',
+    error: 'Erreur',
+    abandoned: 'Abandonné'
   }
+  return map[props.status] || props.status
 })
+
+const statusClass = computed(() => `status-${props.status.toLowerCase()}`)
 </script>
 
 <style scoped>
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 1;
-  border: 1px solid transparent; /* default */
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
   white-space: nowrap;
 }
 
@@ -42,49 +45,65 @@ const statusLabel = computed(() => {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: currentColor;
 }
 
-/* Status Variants */
-.proposed { 
-  background: rgba(59, 130, 246, 0.1); 
-  color: #60a5fa; 
-  border-color: rgba(59, 130, 246, 0.2); 
+/* Specific Statuses */
+.status-proposed {
+  background: rgba(238, 238, 238, 0.05);
+  color: var(--text-secondary);
+  border-color: var(--border-subtle);
+}
+.status-proposed .status-dot { background: var(--text-muted); }
+
+.status-writing {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.status-writing .status-dot { 
+  background: var(--color-warning); 
+  animation: pulse 1.5s infinite;
 }
 
-.writing { 
-  background: rgba(245, 158, 11, 0.1); 
-  color: #fbbf24; 
-  border-color: rgba(245, 158, 11, 0.2); 
+.status-written {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.2);
 }
+.status-written .status-dot { background: var(--color-success); }
 
-.written { 
-  background: rgba(16, 185, 129, 0.1); 
-  color: #34d399; 
-  border-color: rgba(16, 185, 129, 0.2); 
+.status-validated {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.2);
 }
+.status-validated .status-dot { background: #3b82f6; }
 
-.validated { 
-  background: rgba(16, 185, 129, 0.15); 
-  color: #34d399; 
-  border-color: rgba(16, 185, 129, 0.3); 
+.status-published {
+  background: var(--primary-subtle);
+  color: var(--primary);
+  border-color: rgba(212, 77, 91, 0.2);
 }
+.status-published .status-dot { background: var(--primary); }
 
-.published { 
-  background: rgba(139, 92, 246, 0.1); 
-  color: #a78bfa; 
-  border-color: rgba(139, 92, 246, 0.2); 
+.status-error {
+  background: var(--color-error-bg);
+  color: var(--color-error);
+  border-color: rgba(212, 77, 91, 0.2);
 }
+.status-error .status-dot { background: var(--color-error); }
 
-.error { 
-  background: rgba(239, 68, 68, 0.1); 
-  color: #f87171; 
-  border-color: rgba(239, 68, 68, 0.2); 
+.status-abandoned {
+  background: rgba(0, 0, 0, 0.2);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  text-decoration: line-through;
 }
+.status-abandoned .status-dot { background: var(--text-muted); }
 
-.abandoned { 
-  background: rgba(113, 113, 122, 0.1); 
-  color: #a1a1aa; 
-  border-color: rgba(113, 113, 122, 0.2); 
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
 }
 </style>
