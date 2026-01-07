@@ -37,7 +37,8 @@
           <tr 
             v-for="article in articles" 
             :key="article.id" 
-            class="article-row"
+            class="article-row clickable"
+            @click="goToArticle(article.id)"
           >
             <td>
               <div class="article-info">
@@ -100,6 +101,7 @@
                   <div v-if="processingId === article.id" class="loader-sm"></div>
                   <span>{{ (processingId === article.id) ? 'Rédaction...' : 'Rédiger' }}</span>
                 </button>
+
 
                 <!-- Copy Button (if at least one version exists) -->
                 <button 
@@ -409,6 +411,8 @@ onMounted(() => {
 .articles-table tr td {
   padding: 16px;
   vertical-align: top;
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
 }
 
 .articles-table tr td:first-child {
@@ -427,10 +431,21 @@ onMounted(() => {
   background: var(--bg-card-hover);
   box-shadow: var(--shadow-md);
   position: relative;
+  z-index: 1;
+}
+
+.article-row:hover td {
+  border-top-color: var(--border-active);
+  border-bottom-color: var(--border-active);
 }
 
 .article-row:hover td:first-child {
+  border-left-color: var(--border-active);
   box-shadow: inset 4px 0 0 -1px var(--primary);
+}
+
+.article-row:hover td:last-child {
+  border-right-color: var(--border-active);
 }
 
 /* Content Styling */
