@@ -2,7 +2,7 @@
   <div class="login-container">
     <div class="login-card">
       <div class="logo">
-        <h1 class="brand">Digi Blog</h1>
+        <h1 class="brand">DigiBlog</h1>
         <p class="subtitle">Transformez l’actualité en articles de blog prêts à publier</p>
       </div>
 
