@@ -485,6 +485,10 @@ onMounted(() => {
   border-color: var(--primary);
 }
 
+.modules-cell {
+  overflow: visible !important;
+}
+
 .error-indication {
   font-size: 10px;
   color: var(--color-error);

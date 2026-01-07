@@ -12,22 +12,24 @@
       </span>
     </div>
 
-    <transition name="fade">
+    <transition name="dropdown">
       <div v-if="isOpen" class="dropdown-menu">
-        <div 
-          v-for="option in availableModules" 
-          :key="option.id"
-          class="dropdown-item"
-          @click="toggleModule(option)"
-          :class="{ active: isSelected(option.id) }"
-        >
-          <span class="check-box">
-             <svg v-if="isSelected(option.id)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="20 6 9 17 4 12"></polyline></svg>
-          </span>
-          {{ option.name }}
-        </div>
-        <div v-if="availableModules.length === 0" class="empty-dropdown">
-          No modules available
+        <div class="dropdown-content">
+          <div 
+            v-for="option in availableModules" 
+            :key="option.id"
+            class="dropdown-item"
+            @click="toggleModule(option)"
+            :class="{ active: isSelected(option.id) }"
+          >
+            <span class="check-box">
+               <svg v-if="isSelected(option.id)" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </span>
+            <span class="item-label">{{ option.name }}</span>
+          </div>
+          <div v-if="availableModules.length === 0" class="empty-dropdown">
+            No modules available
+          </div>
         </div>
       </div>
     </transition>
@@ -151,44 +153,78 @@ onUnmounted(() => {
 
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: var(--bg-card);
-  border: 1px solid var(--border-subtle);
+  background: #111111; /* Solid dark background for contrast */
+  border: 1px solid var(--border-active);
   border-radius: var(--radius-lg);
-  z-index: 50;
-  box-shadow: var(--shadow-xl); /* Deeper shadow */
-  max-height: 240px;
+  z-index: 100;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  overflow: hidden; /* For rounded corners with inner scroll */
+}
+
+.dropdown-content {
+  max-height: 280px;
   overflow-y: auto;
   padding: 6px;
 }
 
+/* Custom scrollbar for the dropdown */
+.dropdown-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dropdown-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb {
+  background: var(--border-active);
+  border-radius: 10px;
+}
+
+.dropdown-content::-webkit-scrollbar-thumb:hover {
+  background: var(--border-highlight);
+}
+
 .dropdown-item {
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 13px;
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border-radius: var(--radius-md);
-  transition: all var(--duration-fast);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.item-label {
+  line-height: 1.4;
+  font-weight: 400;
 }
 
 .dropdown-item:hover {
   background: var(--bg-card-hover);
   color: var(--text-primary);
+  transform: translateX(2px);
 }
 
 .dropdown-item.active {
-  background: var(--bg-card-hover);
+  background: rgba(212, 77, 91, 0.08);
   color: var(--text-primary);
 }
 
+.dropdown-item.active .item-label {
+  font-weight: 500;
+}
+
 .check-box {
-  width: 16px;
-  height: 16px;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--border-active);
   border-radius: 4px;
   display: flex;
@@ -201,13 +237,26 @@ onUnmounted(() => {
 
 .dropdown-item.active .check-box {
   border-color: var(--primary);
-  background: rgba(212, 77, 91, 0.1); 
+  background: var(--primary);
+  color: white;
 }
 
 .empty-dropdown {
-  padding: 12px;
+  padding: 20px 12px;
   text-align: center;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* Dropdown Animation */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
 }
 </style>
