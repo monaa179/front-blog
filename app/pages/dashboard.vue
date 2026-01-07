@@ -24,13 +24,13 @@
       <table class="articles-table">
         <thead>
           <tr>
-            <th style="width: 20%">Titre</th>
-            <th style="width: 20%">Description</th>
-            <th style="width: 50px; text-align: center;">URL</th>
-            <th style="width: 130px">Statut</th>
+            <th style="width: 40%">Titre</th>
+            <th style="width: 30%">Description</th>
+            <th style="width: 40px; text-align: center;">URL</th>
+            <th style="width: 120px">Statut</th>
             <th style="width: 140px">Modules</th>
-            <th style="width: 100px">Date</th>
-            <th style="width: 160px; text-align: right;">Actions</th>
+            <th style="width: 90px">Date</th>
+            <th style="width: 140px; text-align: right;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -41,14 +41,14 @@
           >
             <td>
               <div class="article-info">
-                <div class="article-title" :title="article.original_title">
+                <div class="article-title">
                   <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
                   <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
                 </div>
               </div>
             </td>
             <td>
-              <div class="article-desc" :title="article.original_description || ''">
+              <div class="article-desc">
                 {{ article.original_description || '—' }}
               </div>
             </td>
@@ -398,6 +398,7 @@ onMounted(() => {
   transition: all 0.2s ease;
   box-shadow: var(--shadow-sm);
   cursor: default;
+  vertical-align: top;
 }
 
 .article-row.clickable {
@@ -405,6 +406,11 @@ onMounted(() => {
 }
 
 /* Rounded corners for the row */
+.articles-table tr td {
+  padding: 16px;
+  vertical-align: top;
+}
+
 .articles-table tr td:first-child {
   border-left: 1px solid var(--border-subtle);
   border-top-left-radius: var(--radius-lg);
@@ -418,10 +424,13 @@ onMounted(() => {
 }
 
 .article-row:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-active);
   background: var(--bg-card-hover);
+  box-shadow: var(--shadow-md);
+  position: relative;
+}
+
+.article-row:hover td:first-child {
+  box-shadow: inset 4px 0 0 -1px var(--primary);
 }
 
 /* Content Styling */
@@ -432,13 +441,10 @@ onMounted(() => {
 
 .article-title {
   font-weight: 600;
-  color: var(--text-primary);
-  font-size: 14px;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .version-badge {
@@ -457,23 +463,20 @@ onMounted(() => {
 }
 
 .article-desc {
-  font-size: 12px;
-  color: var(--text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  line-height: 1.5;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  word-break: break-word;
 }
 
 .source-link-icon {
-  color: var(--text-secondary);
-  padding: 8px;
+  color: var(--text-muted);
+  padding: 6px;
   border-radius: 6px;
   display: inline-flex;
   background: var(--bg-input);
   border: 1px solid var(--border-subtle);
+  margin-top: 2px;
 }
 
 .source-link-icon:hover {
