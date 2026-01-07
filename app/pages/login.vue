@@ -2,8 +2,8 @@
   <div class="login-container">
     <div class="login-card">
       <div class="logo">
-        <h1 class="brand">BlogWriter</h1>
-        <p class="subtitle">Internal Content Automation</p>
+        <h1 class="brand">Digi Blog</h1>
+        <p class="subtitle">Transformez l’actualité en articles de blog prêts à publier</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="login-form">

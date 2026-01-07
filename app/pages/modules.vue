@@ -3,7 +3,7 @@
     <div class="header-row">
       <div class="title-section">
         <h1>Modules</h1>
-        <p class="subtitle">Manage the content blocks available for your team.</p>
+        <p class="subtitle">Ajoutez les modules de Digichef.</p>
       </div>
     </div>
 
@@ -31,7 +31,7 @@
         <div class="form-group checkbox-group">
            <label class="checkbox-label">
              <input type="checkbox" v-model="newModule.active">
-             <span>Active by default</span>
+             <span>Module actif par défaut</span>
            </label>
         </div>
         <div class="form-actions">

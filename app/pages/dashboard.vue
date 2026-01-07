@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="header-text">
         <h1>Dashboard</h1>
-        <p class="subtitle">Vue d'ensemble de votre pipeline de contenu.</p>
+        <p class="subtitle">Vue d'ensemble des articles.</p>
       </div>
       <div class="header-actions">
         <!-- Future: Filters or global actions -->
