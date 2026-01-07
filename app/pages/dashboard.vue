@@ -37,13 +37,14 @@
           <tr 
             v-for="article in articles" 
             :key="article.id" 
-            class="article-row" 
-            :class="{ clickable: ['written', 'validated', 'published'].includes(article.status) }"
-            @click="handleRowClick(article)"
+            class="article-row"
           >
             <td>
               <div class="article-info">
-                <div class="article-title" :title="article.original_title">{{ article.original_title }}</div>
+                <div class="article-title" :title="article.original_title">
+                  <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
+                  <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
+                </div>
               </div>
             </td>
             <td>
@@ -90,20 +91,19 @@
             </td>
             <td class="text-right" @click.stop>
               <div class="actions">
-                <!-- Write Button -->
+                <!-- Write Button: always visible -->
                 <button 
-                  v-if="canWrite(article.status)"
                   class="btn btn-primary btn-sm btn-write" 
                   @click="handleWrite(article)"
                   :disabled="processingId === article.id"
                 >
                   <div v-if="processingId === article.id" class="loader-sm"></div>
-                  <span>{{ (processingId === article.id) ? 'Redaction...' : 'Rédiger' }}</span>
+                  <span>{{ (processingId === article.id) ? 'Rédaction...' : 'Rédiger' }}</span>
                 </button>
 
-                <!-- Copy Button (if written) -->
+                <!-- Copy Button (if at least one version exists) -->
                 <button 
-                  v-if="article.status === 'written' || article.status === 'published' || article.status === 'validated'"
+                  v-if="article.versions_count > 0"
                   class="btn btn-ghost btn-sm btn-icon-only"
                   @click="copyLatestVersion(article)"
                   title="Copier le contenu"
@@ -151,6 +151,7 @@ interface Article {
   created_at: string;
   modules: Module[];
   last_version_content?: string;
+  versions_count: number;
 }
 
 const loading = ref(true)
@@ -204,7 +205,8 @@ const fetchArticles = async () => {
       return {
         ...article,
         modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : [],
-        last_version_content: lastVersion?.content || null
+        last_version_content: lastVersion?.content || null,
+        versions_count: versions.length || 0
       }
     })
   }
@@ -258,17 +260,38 @@ const handleWrite = async (article: any) => {
     // Update status locally and in Supabase to show immediate feedback
     await updateStatus(article.id, 'writing')
 
+    // Create a placeholder version entry so each click creates a new version record (non-destructive)
+    let createdVersionId: number | null = null
+    try {
+      const { data: insertedData, error: insertErr } = await client.from('article_versions').insert({ article_id: article.id, content: null } as any).select('*')
+      if (insertErr) console.error('Failed to insert placeholder version', insertErr)
+      else if (insertedData && Array.isArray(insertedData) && insertedData.length > 0) {
+        createdVersionId = insertedData[0].id
+        // update local article versions_count and set placeholder content
+        const a = articles.value.find((x: any) => x.id === article.id)
+        if (a) {
+          a.versions_count = (a.versions_count || 0) + 1
+          a.last_version_content = a.last_version_content ?? ''
+        }
+      }
+    } catch (ie) {
+      console.error('[handleWrite] error inserting placeholder version', ie)
+    }
+
     // Call Make webhook to trigger the external drafting automation
     const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q'
 
-    console.debug('[handleWrite] calling webhook', makeWebhook, 'payload:', { article_id: article.id })
+    const payload: any = { article_id: article.id }
+    if (createdVersionId) payload.version_id = createdVersionId
+
+    console.debug('[handleWrite] calling webhook', makeWebhook, 'payload:', payload)
 
     const res = await fetch(makeWebhook, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ article_id: article.id })
+      body: JSON.stringify(payload)
     })
 
     console.debug('[handleWrite] webhook response status', res.status)
@@ -296,11 +319,8 @@ const handleWrite = async (article: any) => {
   }
 }
 
-const handleRowClick = (article: Article) => {
-  const readableStatuses = ['written', 'validated', 'published']
-  if (readableStatuses.includes(article.status)) {
-    router.push(`/articles/${article.id}`)
-  }
+const goToArticle = (id: number) => {
+  router.push(`/articles/${id}`)
 }
 
 const copyLatestVersion = (article: Article) => {
@@ -419,6 +439,16 @@ onMounted(() => {
   line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.version-badge {
+  display: inline-block;
+  margin-left: 8px;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
 }
 
 .article-date {
