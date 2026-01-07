@@ -56,20 +56,37 @@
             <p>Le contenu apparaîtra ici une fois la rédaction terminée.</p>
           </div>
 
-          <div v-else class="content-viewer">
-            <div class="viewer-toolbar">
-              <span class="version-tag">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                Rédigé le {{ formatDate(latestVersion?.created_at) }}
-              </span>
-              <button class="btn btn-primary btn-sm copy-btn" @click="copyContent">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                Copier le contenu
-              </button>
+          <div v-else class="content-editor">
+            <div class="editor-toolbar">
+              <div class="toolbar-left">
+                <span class="version-tag">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  Version du {{ formatDate(latestVersion?.created_at) }}
+                </span>
+                <span v-if="isModified" class="modified-badge">Modifié</span>
+              </div>
+              <div class="toolbar-actions">
+                <button v-if="isModified" class="btn btn-ghost btn-sm reset-btn" @click="resetContent">
+                  Réinitialiser
+                </button>
+                <button class="btn btn-primary btn-sm copy-btn" @click="copyContent" :disabled="!editedContent">
+                  <template v-if="showCopySuccess">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Copié ✓
+                  </template>
+                  <template v-else>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    Copier le contenu
+                  </template>
+                </button>
+              </div>
             </div>
-            <div class="article-body">
-              <div v-if="currentContent" class="article-text">{{ currentContent }}</div>
-              <div v-else class="text-muted p-4">Le contenu de cette version est vide.</div>
+            <div class="editor-body">
+              <textarea 
+                v-model="editedContent" 
+                class="markdown-editor" 
+                placeholder="Le contenu de cette version est vide. Commencez à rédiger ici..."
+              ></textarea>
             </div>
           </div>
         </section>
@@ -148,15 +165,35 @@ const versions = computed(() => {
 const latestVersion = computed(() => versions.value[selectedVersionIndex.value] || null)
 const currentContent = computed(() => latestVersion.value?.content || null)
 
+const editedContent = ref('')
+const showCopySuccess = ref(false)
+
+const isModified = computed(() => {
+    const original = currentContent.value || ''
+    return editedContent.value !== original
+})
+
+const resetContent = () => {
+    editedContent.value = currentContent.value || ''
+}
+
+// Watch for version changes to update the editor
+watch(currentContent, (newVal) => {
+    editedContent.value = newVal || ''
+}, { immediate: true })
+
 const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '-'
     return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
 }
 
 const copyContent = () => {
-    if (currentContent.value) {
-        navigator.clipboard.writeText(currentContent.value)
-        alert('Contenu copié dans le presse-papier !')
+    if (editedContent.value) {
+        navigator.clipboard.writeText(editedContent.value)
+        showCopySuccess.value = true
+        setTimeout(() => {
+            showCopySuccess.value = false
+        }, 2000)
     }
 }
 </script>
@@ -260,21 +297,55 @@ const copyContent = () => {
   outline: none;
 }
 
-.content-viewer {
+.content-editor {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
 }
 
-.viewer-toolbar {
+.editor-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 12px 24px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-sidebar);
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.modified-badge {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.reset-btn {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.reset-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-input);
 }
 
 .version-tag {
@@ -290,20 +361,35 @@ const copyContent = () => {
   align-items: center;
   gap: 8px;
   font-weight: 600;
+  min-width: 160px;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.article-body {
+.editor-body {
+  padding: 0;
+  position: relative;
+}
+
+.markdown-editor {
+  width: 100%;
+  min-height: 600px;
   padding: 32px;
-  min-height: 400px;
-}
-
-.article-text {
-  font-family: 'Inter', sans-serif;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   font-size: 16px;
   line-height: 1.8;
-  color: var(--text-primary);
+  resize: vertical;
+  outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.markdown-editor::placeholder {
+  color: var(--text-muted);
+  opacity: 0.5;
 }
 
 .empty-state {
