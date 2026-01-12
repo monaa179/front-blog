@@ -43,17 +43,6 @@
             <td>
               <div class="article-info">
                   <div class="title-with-favorite">
-                    <button 
-                      class="btn-favorite" 
-                      :class="{ 'is-favorite': favoriteIds.has(article.id) }"
-                      @click.stop="toggleFavorite(article.id)"
-                      :disabled="pendingIds.has(article.id)"
-                      :title="favoriteIds.has(article.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
-                    >
-                      <div v-if="pendingIds.has(article.id)" class="loader-xs"></div>
-                      <svg v-else-if="favoriteIds.has(article.id)" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                    </button>
                     <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
                     <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
                   </div>
@@ -170,7 +159,9 @@ interface Article {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const articles = ref<Article[]>([])
-const { favoriteIds, pendingIds, fetchFavorites, toggleFavorite } = useFavorites()
+
+// Use shared articles composable to fetch articles (modules + versions)
+const { articles: fetchedArticles, loading: articlesLoading, error: articlesError, fetch: fetchArticles } = useArticles({ order: { column: 'created_at', ascending: false } })
 const allModules = ref<Module[]>([])
 const processingId = ref<number | null>(null)
 
@@ -189,43 +180,13 @@ const fetchModules = async () => {
   else allModules.value = (data as any[]) || []
 }
 
-const fetchArticles = async () => {
-  loading.value = true
-  // Fetch articles with modules and the latest version
-  const { data, error: err } = await client
-    .from('articles')
-    .select(`
-      *,
-      article_modules (
-        module:modules (*)
-      ),
-      article_versions (
-        content,
-        created_at
-      )
-    `)
-    .order('created_at', { ascending: false })
-
-  if (err) {
-    error.value = err.message
-  } else {
-    articles.value = (data as any[]).map(article => {
-      // Pick the latest version content if available
-      const versions = article.article_versions || []
-      const lastVersion = versions.length > 0 
-        ? versions.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        : null
-
-      return {
-        ...article,
-        modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : [],
-        last_version_content: lastVersion?.content || null,
-        versions_count: versions.length || 0
-      }
-    })
-  }
-  loading.value = false
-}
+// fetchArticles provided by useArticles; keep local articles in sync
+watchEffect(() => {
+  articles.value = (fetchedArticles.value || [])
+  // Bubble up loading/error states
+  loading.value = articlesLoading.value
+  error.value = articlesError.value
+})
 
 const updateStatus = async (id: number, newStatus: string) => {
   const article = articles.value.find(a => a.id === id)
@@ -361,7 +322,6 @@ const deleteArticle = async (id: number) => {
 onMounted(() => {
   fetchModules()
   fetchArticles()
-  fetchFavorites()
 })
 </script>
 

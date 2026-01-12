@@ -56,15 +56,7 @@
               </span>
             </div>
              <div class="card-actions">
-               <button 
-                 class="btn btn-ghost btn-sm btn-icon-only btn-favorite" 
-                 :class="{ 'is-favorite': favoriteIds.has(article.id) }"
-                 @click.stop="toggleFavorite(article.id)"
-                 :title="favoriteIds.has(article.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
-               >
-                 <svg v-if="favoriteIds.has(article.id)" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-               </button>
+               <!-- Favorites removed: no favorite button -->
                <button class="btn btn-ghost btn-sm btn-icon-only" @click.stop="copyContent(article)">
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                </button>
@@ -98,52 +90,25 @@ const loading = ref(true)
 const articles = ref<Article[]>([])
 const allModules = ref<any[]>([])
 const selectedModuleId = ref<number | null>(null)
-const { favoriteIds, fetchFavorites, toggleFavorite } = useFavorites()
 
 const fetchModules = async () => {
   const { data } = await client.from('modules').select('*').eq('active', true)
   allModules.value = data || []
 }
 
-const fetchLibrary = async () => {
-  loading.value = true
-  
-  // Fetch articles that have at least one version
-  const { data, error } = await client
-    .from('articles')
-    .select(`
-      *,
-      article_modules (
-        module:modules (*)
-      ),
-      article_versions (
-        content,
-        created_at
-      )
-    `)
-    .in('status', ['written', 'validated', 'published'])
-    .order('created_at', { ascending: false })
+// Use shared useArticles composable to fetch library articles
+const { articles: fetchedArticles, loading: fetchedLoading, error: fetchedError, fetch: fetchLibraryArticles } = useArticles({ statuses: ['written', 'validated', 'published'], order: { column: 'created_at', ascending: false } })
 
-  if (error) {
-    console.error('Error fetching library:', error)
-  } else {
-    articles.value = (data as any[]).map(art => {
-      const versions = art.article_versions || []
-      const lastVersion = versions.length > 0 
-        ? versions.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        : null
-        
-      return {
-        ...art,
-        modules: art.article_modules ? art.article_modules.map((am: any) => am.module) : [],
-        last_version_at: lastVersion?.created_at || art.created_at,
-        last_version_content: lastVersion?.content || null
-      }
-    }).sort((a, b) => new Date(b.last_version_at!).getTime() - new Date(a.last_version_at!).getTime())
-  }
-  
-  loading.value = false
-}
+// Keep local articles in sync with fetchedArticles
+watchEffect(() => {
+  articles.value = (fetchedArticles.value || []).map(a => ({
+    ...a,
+    // map last_version_created_at -> last_version_at for backward compatibility
+    last_version_at: a.last_version_created_at || a.created_at,
+    last_version_content: a.last_version_content || null
+  }))
+  loading.value = fetchedLoading.value
+})
 
 const filteredArticles = computed(() => {
   if (!selectedModuleId.value) return articles.value
@@ -166,8 +131,7 @@ const copyContent = (article: Article) => {
 
 onMounted(() => {
   fetchModules()
-  fetchLibrary()
-  fetchFavorites()
+  fetchLibraryArticles()
 })
 </script>
 

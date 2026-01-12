@@ -1,15 +1,15 @@
 <template>
   <div class="favorites-page">
     <div class="page-header">
-      <div class="header-text">
-        <h1>Mes Favoris</h1>
-        <p class="subtitle">Vos articles préférés en un seul endroit.</p>
+        <div class="header-text">
+          <h1>Favoris</h1>
+          <p class="subtitle">Tous les articles validés.</p>
+        </div>
       </div>
-    </div>
 
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <span>Chargement de vos favoris...</span>
+      <span>Chargement des articles validés...</span>
     </div>
 
     <div v-else-if="error" class="error-msg">
@@ -17,10 +17,10 @@
       {{ error }}
     </div>
 
-    <div v-else-if="favoritedArticles.length === 0" class="empty-state">
-      <div class="empty-icon">❤️</div>
-      <h3>Aucun favori pour le moment</h3>
-      <p>Parcourez le dashboard et cliquez sur le cœur pour ajouter des articles à vos favoris.</p>
+    <div v-else-if="validatedArticles.length === 0" class="empty-state">
+      <div class="empty-icon">📄</div>
+      <h3>Aucun article validé pour le moment</h3>
+      <p>Les articles validés apparaîtront ici.</p>
       <NuxtLink to="/dashboard" class="btn btn-primary mt-4">Retour au Dashboard</NuxtLink>
     </div>
 
@@ -39,7 +39,7 @@
         </thead>
         <tbody>
           <tr 
-            v-for="article in favoritedArticles" 
+            v-for="article in validatedArticles" 
             :key="article.id" 
             class="article-row clickable"
             @click="goToArticle(article.id)"
@@ -47,15 +47,6 @@
             <td>
               <div class="article-info">
                   <div class="title-with-favorite">
-                    <button 
-                      class="btn-favorite is-favorite" 
-                      @click.stop="toggleFavorite(article.id)"
-                      :disabled="pendingIds.has(article.id)"
-                      title="Retirer des favoris"
-                    >
-                      <div v-if="pendingIds.has(article.id)" class="loader-xs"></div>
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                    </button>
                     <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
                     <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
                   </div>
@@ -117,9 +108,12 @@
 import { format } from 'date-fns'
 
 const client = useSupabaseClient()
-const user = useSupabaseUser()
 const router = useRouter()
-const { favoriteIds, pendingIds, toggleFavorite, fetchFavorites } = useFavorites()
+
+// Use the shared articles composable and request only VALIDATED articles.
+// Note: to be robust against casing in the DB we request both 'VALIDATED' and 'validated'.
+// Business requirement: only show articles where status = 'VALIDATED'.
+const { articles: validatedArticles, loading, error, fetch } = useArticles({ statuses: ['VALIDATED', 'validated'], order: { column: 'created_at', ascending: false } })
 
 interface Module {
   id: number;
@@ -139,69 +133,14 @@ interface Article {
   versions_count: number;
 }
 
-const loading = ref(true)
-const error = ref<string | null>(null)
-const favoritedArticles = ref<Article[]>([])
+// validatedArticles is provided by useArticles
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
   return format(new Date(dateStr), 'dd/MM/yyyy')
 }
 
-const fetchFavoritedArticles = async () => {
-  if (!user.value?.id) {
-    console.warn('[FavoritesPage] fetchFavoritedArticles called but user.id is missing')
-    return
-  }
-  
-  loading.value = true
-  error.value = null
-
-  try {
-    // We join article_favorites with articles
-    const { data, error: err } = await client
-      .from('article_favorites')
-      .select(`
-        article_id,
-        article:articles (
-          *,
-          article_modules (
-            module:modules (*)
-          ),
-          article_versions (
-            content,
-            created_at
-          )
-        )
-      `)
-      .eq('user_id', user.value.id)
-
-    if (err) throw err
-
-    favoritedArticles.value = (data as any[]).map(row => {
-      const article = row.article
-      if (!article) return null
-
-      const versions = article.article_versions || []
-      const lastVersion = versions.length > 0 
-        ? versions.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        : null
-
-      return {
-        ...article,
-        modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : [],
-        last_version_content: lastVersion?.content || null,
-        versions_count: versions.length || 0
-      }
-    }).filter(Boolean) as Article[]
-
-  } catch (err: any) {
-    console.error('[FavoritesPage] Supabase Error:', err)
-    error.value = `Erreur: ${err.message || 'Impossible de charger vos favoris.'}`
-  } finally {
-    loading.value = false
-  }
-}
+// fetch is provided by useArticles
 
 const goToArticle = (id: number) => {
   router.push(`/articles/${id}`)
@@ -217,20 +156,9 @@ const copyLatestVersion = (article: Article) => {
 }
 
 // Watch favoriteIds to remove articles from the list when unfavorited
-watch(favoriteIds, (newVal) => {
-  favoritedArticles.value = favoritedArticles.value.filter(a => newVal.has(a.id))
-}, { deep: true })
-
-// Load favorites when user is available
-watch(() => user.value?.id, async (userId) => {
-  if (userId) {
-    console.log('[FavoritesPage] User available, fetching favorites...', userId)
-    await fetchFavorites() // Sync global favorite IDs
-    await fetchFavoritedArticles()
-  } else {
-    loading.value = false
-  }
-}, { immediate: true })
+onMounted(() => {
+  fetch()
+})
 </script>
 
 <style scoped>
