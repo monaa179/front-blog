@@ -42,10 +42,21 @@
           >
             <td>
               <div class="article-info">
-                <div class="article-title">
-                  <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
-                  <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
-                </div>
+                  <div class="title-with-favorite">
+                    <button 
+                      class="btn-favorite" 
+                      :class="{ 'is-favorite': favoriteIds.has(article.id) }"
+                      @click.stop="toggleFavorite(article.id)"
+                      :disabled="pendingIds.has(article.id)"
+                      :title="favoriteIds.has(article.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+                    >
+                      <div v-if="pendingIds.has(article.id)" class="loader-xs"></div>
+                      <svg v-else-if="favoriteIds.has(article.id)" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    </button>
+                    <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
+                    <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
+                  </div>
               </div>
             </td>
             <td>
@@ -159,6 +170,7 @@ interface Article {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const articles = ref<Article[]>([])
+const { favoriteIds, pendingIds, fetchFavorites, toggleFavorite } = useFavorites()
 const allModules = ref<Module[]>([])
 const processingId = ref<number | null>(null)
 
@@ -349,6 +361,7 @@ const deleteArticle = async (id: number) => {
 onMounted(() => {
   fetchModules()
   fetchArticles()
+  fetchFavorites()
 })
 </script>
 
@@ -477,6 +490,39 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+.title-with-favorite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-favorite {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-favorite:hover {
+  transform: scale(1.1);
+  color: var(--primary);
+}
+
+.btn-favorite.is-favorite {
+  color: #ff4757; /* A nice red for favorites */
+}
+
+.btn-favorite svg {
+  width: 16px;
+  height: 16px;
+}
+
 .article-desc {
   font-size: 13px;
   color: var(--text-muted);
@@ -554,6 +600,20 @@ onMounted(() => {
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.loader-xs {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 71, 87, 0.3);
+  border-top-color: #ff4757;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.btn-favorite:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-icon-only {

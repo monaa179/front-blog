@@ -55,11 +55,20 @@
                 {{ mod.name }}
               </span>
             </div>
-            <div class="card-actions">
+             <div class="card-actions">
+               <button 
+                 class="btn btn-ghost btn-sm btn-icon-only btn-favorite" 
+                 :class="{ 'is-favorite': favoriteIds.has(article.id) }"
+                 @click.stop="toggleFavorite(article.id)"
+                 :title="favoriteIds.has(article.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'"
+               >
+                 <svg v-if="favoriteIds.has(article.id)" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+               </button>
                <button class="btn btn-ghost btn-sm btn-icon-only" @click.stop="copyContent(article)">
                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                </button>
-            </div>
+             </div>
           </div>
         </div>
       </div>
@@ -89,6 +98,7 @@ const loading = ref(true)
 const articles = ref<Article[]>([])
 const allModules = ref<any[]>([])
 const selectedModuleId = ref<number | null>(null)
+const { favoriteIds, fetchFavorites, toggleFavorite } = useFavorites()
 
 const fetchModules = async () => {
   const { data } = await client.from('modules').select('*').eq('active', true)
@@ -157,6 +167,7 @@ const copyContent = (article: Article) => {
 onMounted(() => {
   fetchModules()
   fetchLibrary()
+  fetchFavorites()
 })
 </script>
 
@@ -311,6 +322,26 @@ onMounted(() => {
   border-radius: 50%;
   animation: spin 1s infinite linear;
   margin: 0 auto 16px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-favorite {
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.btn-favorite:hover {
+  transform: scale(1.1);
+  color: var(--primary);
+}
+
+.btn-favorite.is-favorite {
+  color: #ff4757;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
