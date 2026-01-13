@@ -2,11 +2,8 @@
   <div class="dashboard-page">
     <div class="page-header">
       <div class="header-text">
-        <h1>Dashboard</h1>
-        <p class="subtitle">Vue d'ensemble des articles.</p>
-      </div>
-      <div class="header-actions">
-        <!-- Future: Filters or global actions -->
+        <h1>Archive</h1>
+        <p class="subtitle">Vue d'ensemble des articles abandonnés.</p>
       </div>
     </div>
 
@@ -27,25 +24,24 @@
             <th style="width: 40%">Titre</th>
             <th style="width: 30%">Description</th>
             <th style="width: 40px; text-align: center;">URL</th>
-            <th style="width: 120px">Statut</th>
-            <th style="width: 140px">Modules</th>
             <th style="width: 90px">Date</th>
+            <th style="width: 120px">Statut</th>
             <th style="width: 140px; text-align: right;">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr 
-            v-for="article in proposedArticles" 
+            v-for="article in articles" 
             :key="article.id" 
             class="article-row clickable"
             @click="goToArticle(article.id)"
           >
             <td>
               <div class="article-info">
-                  <div class="title-with-favorite">
-                    <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
-                    <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
-                  </div>
+                <div class="title-with-favorite">
+                  <a href="#" @click.prevent>{{ article.original_title }}</a>
+                  <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
+                </div>
               </div>
             </td>
             <td>
@@ -53,7 +49,7 @@
                 {{ article.original_description || '—' }}
               </div>
             </td>
-            <td class="text-center" @click.stop>
+            <td class="text-center">
               <a 
                 v-if="article.source_url" 
                 :href="article.source_url" 
@@ -65,6 +61,9 @@
               </a>
               <span v-else class="text-muted">—</span>
             </td>
+            <td>
+              <span class="article-date">{{ formatDate(article.created_at) }}</span>
+            </td>
             <td class="status-cell" @click.stop>
               <div class="status-wrapper">
                 <StatusBadge :status="article.status" />
@@ -73,26 +72,12 @@
                   :value="article.status"
                   @change="(e) => updateStatus(article.id, (e.target as HTMLSelectElement).value)"
                 >
-                  <option v-for="s in filteredStatuses" :key="s" :value="s">{{ s }}</option>
+                  <option v-for="s in statusOptions" :key="s" :value="s">{{ s }}</option>
                 </select>
               </div>
-              <div v-if="article.status === 'error'" class="error-indication" title="Une erreur est survenue lors de la rédaction">
-                ⚠️ Erreur
-              </div>
-            </td>
-            <td class="modules-cell" @click.stop>
-              <ModuleSelector 
-                :model-value="article.modules" 
-                :available-modules="allModules"
-                @update:model-value="(newModules) => updateModules(article.id, newModules)"
-              />
-            </td>
-            <td>
-              <span class="article-date">{{ formatDate(article.created_at) }}</span>
             </td>
             <td class="text-right" @click.stop>
               <div class="actions">
-                <!-- Write Button: always visible -->
                 <button 
                   class="btn btn-primary btn-sm btn-write" 
                   @click="handleWrite(article)"
@@ -102,8 +87,6 @@
                   <span>{{ (processingId === article.id) ? 'Rédaction...' : 'Rédiger' }}</span>
                 </button>
 
-
-                <!-- Copy Button (if at least one version exists) -->
                 <button 
                   v-if="article.versions_count > 0"
                   class="btn btn-ghost btn-sm btn-icon-only"
@@ -113,7 +96,6 @@
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
 
-                <!-- Delete Action -->
                 <button 
                   class="btn btn-ghost btn-sm btn-icon-only text-danger"
                   @click="deleteArticle(article.id)"
@@ -131,158 +113,46 @@
 </template>
 
 <script setup lang="ts">
-import { format } from 'date-fns'
+import { ref, onMounted } from 'vue';
+import { useArticles } from '@/composables/useArticles';
+import { format } from 'date-fns';
+import StatusBadge from '@/components/StatusBadge.vue';
+import { useRouter } from 'vue-router';
 
-const client = useSupabaseClient()
-const user = useSupabaseUser()
-const router = useRouter()
-const config = useRuntimeConfig()
-
-interface Module {
-  id: number;
-  name: string;
-  slug: string;
-}
-
-interface Article {
-  id: number;
-  original_title: string;
-  original_description: string;
-  source_url: string;
-  status: string;
-  created_at: string;
-  modules: Module[];
-  last_version_content?: string;
-  versions_count: number;
-}
-
-// Adjust the schema and provide both type arguments
-interface DatabaseSchema {
-  articles: {
-    Row: {
-      id: number;
-      status: string;
-      // Add other fields as needed
-    };
-    Insert: {
-      status: string;
-    };
-    Update: {
-      status?: string;
-    };
-  };
-}
-
-const loading = ref(true)
-const error = ref<string | null>(null)
-const articles = ref<Article[]>([])
-const proposedArticles = computed(() => articles.value.filter(article => article.status === 'proposed'))
-
-// Use shared articles composable to fetch articles (modules + versions)
-const { articles: fetchedArticles, loading: articlesLoading, error: articlesError, fetch: fetchArticles } = useArticles({ order: { column: 'created_at', ascending: false } })
-const allModules = ref<Module[]>([])
-const processingId = ref<number | null>(null)
-
-const statusOptions = ['proposed', 'writing', 'written', 'validated', 'published', 'error', 'abandoned']
-const writeableStatuses = ['proposed', 'error', 'abandoned', 'writing'] 
-const filteredStatuses = statusOptions
+const { articles, fetch, loading, error } = useArticles({ statuses: ['abandoned'] });
+const statusOptions = ['proposed', 'writing', 'written', 'validated', 'published', 'error', 'abandoned'];
+const processingId = ref<number | null>(null);
+const router = useRouter();
 
 const formatDate = (dateStr: string) => {
-  if (!dateStr) return ''
-  return format(new Date(dateStr), 'dd/MM/yyyy')
-}
+  if (!dateStr) return '';
+  return format(new Date(dateStr), 'dd/MM/yyyy');
+};
 
-const fetchModules = async () => {
-  const { data, error: err } = await client.from('modules').select('*').eq('active', true)
-  if (err) console.error('Error fetching modules:', err)
-  else allModules.value = (data as any[]) || []
-}
-
-// fetchArticles provided by useArticles; keep local articles in sync
-watchEffect(() => {
-  articles.value = (fetchedArticles.value || [])
-  // Bubble up loading/error states
-  loading.value = articlesLoading.value
-  error.value = articlesError.value
-})
+const goToArticle = (id: number) => {
+  router.push(`/articles/${id}`);
+};
 
 const updateStatus = async (id: number, newStatus: string) => {
-  const article = articles.value.find(a => a.id === id)
+  const article = articles.value.find(a => a.id === id);
   if (article) article.status = newStatus;
 
-  const { error: err } = await client.from('articles').update({ status: newStatus }).eq('id', id);
+  const { error: err } = await useSupabaseClient().from('articles').update({ status: newStatus }).eq('id', id);
   if (err) {
     console.error('Failed to update status', err);
   } else {
-    // Refresh articles after successful status update
-    await fetchArticles();
+    await fetch();
   }
 };
 
-const updateModules = async (articleId: number, newModules: any[]) => {
-  const article = articles.value.find(a => a.id === articleId)
-  if (article) article.modules = newModules
-
-  const { error: deleteErr } = await client.from('article_modules').delete().eq('article_id', articleId)
-  if (deleteErr) {
-    console.error('Error deleting modules', deleteErr)
-    return
-  }
-
-  if (newModules.length > 0) {
-    const insertData = newModules.map(m => ({
-      article_id: articleId,
-      module_id: m.id
-    }))
-    
-    const { error: insertErr } = await client.from('article_modules').insert(insertData as any)
-    if (insertErr) console.error('Error inserting modules', insertErr)
-  }
-}
-
-const canWrite = (status: string) => {
-  return writeableStatuses.includes(status)
-}
-
 const handleWrite = async (article: any) => {
-  // Note: we intentionally avoid returning early here so the fetch is always attempted
-  // Button disabled state (via processingId) prevents double clicks from the UI.
-
-  console.debug('[handleWrite] clicked for article', article?.id)
-
-  // Mark as processing to disable the button in the UI
-  processingId.value = article.id
+  processingId.value = article.id;
 
   try {
-    console.debug('[handleWrite] setting status -> writing (local + db) for', article.id)
-    // Update status locally and in Supabase to show immediate feedback
-    await updateStatus(article.id, 'writing')
+    await updateStatus(article.id, 'writing');
 
-    // Create a placeholder version entry so each click creates a new version record (non-destructive)
-    let createdVersionId: number | undefined
-    try {
-      const { data: insertedData, error: insertErr } = await client.from('article_versions').insert({ article_id: article.id, content: null } as any).select('*')
-      if (insertErr) console.error('Failed to insert placeholder version', insertErr)
-      else if (insertedData && insertedData.length > 0) {
-        createdVersionId = insertedData[0].id
-        // update local article versions_count and set placeholder content
-        const a = articles.value.find((x: any) => x.id === article.id)
-        if (a) {
-          a.versions_count = (a.versions_count || 0) + 1
-          a.last_version_content = a.last_version_content ?? ''
-        }
-      }
-    } catch (ie) {
-      console.error('[handleWrite] error inserting placeholder version', ie)
-    }
-
-    // Call Make webhook to trigger the external drafting automation
-    const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q'
-
-    const payload: any = { article_id: article.id }
-    if (createdVersionId) payload.version_id = createdVersionId
-
-    console.debug('[handleWrite] calling webhook', makeWebhook, 'payload:', payload)
+    const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q';
+    const payload: any = { article_id: article.id };
 
     const res = await fetch(makeWebhook, {
       method: 'POST',
@@ -290,62 +160,43 @@ const handleWrite = async (article: any) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(payload)
-    })
-
-    console.debug('[handleWrite] webhook response status', res.status)
+    });
 
     if (!res.ok) {
-      // If Make returns non-2xx, mark the article as error so user can retry
-      console.error('[handleWrite] Make webhook responded with non-ok status', res.status)
-      await updateStatus(article.id, 'error')
-    } else {
-      console.debug('[handleWrite] webhook called successfully for', article.id)
-      // leave status as 'writing' so server/workflow can update to 'written' when done
+      console.error('Make webhook responded with non-ok status', res.status);
+      await updateStatus(article.id, 'error');
     }
-
   } catch (e) {
-    console.error('[handleWrite] Error triggering write for', article.id, e)
-    // Roll back status to error so user can see and retry
-    try {
-      await updateStatus(article.id, 'error')
-    } catch (innerErr) {
-      console.error('[handleWrite] failed to rollback status for', article.id, innerErr)
-    }
+    console.error('Error triggering write for', article.id, e);
+    await updateStatus(article.id, 'error');
   } finally {
-    // Always clear processing flag so button becomes active again
-    processingId.value = null
+    processingId.value = null;
   }
-}
+};
 
-const goToArticle = (id: number) => {
-  router.push(`/articles/${id}`)
-}
-
-const copyLatestVersion = (article: Article) => {
+const copyLatestVersion = (article: any) => {
   if (article.last_version_content) {
-    navigator.clipboard.writeText(article.last_version_content)
-    // Optional: show a toast
-    alert('Contenu copié !')
+    navigator.clipboard.writeText(article.last_version_content);
+    alert('Contenu copié !');
   } else {
-    alert('Aucun contenu à copier.')
+    alert('Aucun contenu à copier.');
   }
-}
+};
 
 const deleteArticle = async (id: number) => {
-  if (!confirm('Supprimer cet article ?')) return
-  
-  const { error: err } = await client.from('articles').delete().eq('id', id)
+  if (!confirm('Supprimer cet article ?')) return;
+
+  const { error: err } = await useSupabaseClient().from('articles').delete().eq('id', id);
   if (err) {
-    alert('Erreur lors de la suppression')
+    alert('Erreur lors de la suppression');
   } else {
-    articles.value = articles.value.filter(a => a.id !== id)
+    articles.value = articles.value.filter(a => a.id !== id);
   }
-}
+};
 
 onMounted(() => {
-  fetchModules()
-  fetchArticles()
-})
+  fetch();
+});
 </script>
 
 <style scoped>
@@ -630,6 +481,4 @@ onMounted(() => {
   animation: spin 1s infinite linear;
   margin-bottom: 16px;
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
 </style>

@@ -44,7 +44,21 @@
               <h4 class="card-title">{{ article.original_title }}</h4>
               <span class="card-date">{{ formatLibraryDate(article.last_version_at) }}</span>
             </div>
-            <StatusBadge :status="article.status" />
+            <div class="status-wrapper" @click.stop>
+  <StatusBadge :status="article.status" />
+<select
+  class="status-select-hidden"
+  :value="article.status"
+  @change="(e) => updateStatus(article.id, (e.target as HTMLSelectElement).value)"
+>
+  <option value="proposed">Proposé</option>
+  <option value="written">Rédigé</option>
+  <option value="validated">Validé</option>
+  <option value="published">Publié</option>
+  <option value="abandoned">Abandonné</option>
+</select>
+</div>
+
           </div>
           
           <p class="card-desc">{{ article.original_description }}</p>
@@ -91,6 +105,23 @@ const articles = ref<Article[]>([])
 const allModules = ref<any[]>([])
 const selectedModuleId = ref<number | null>(null)
 
+  const updateStatus = async (articleId: number, newStatus: string) => {
+  const { error } = await client
+    .from('articles')
+    .update({ status: newStatus })
+    .eq('id', articleId)
+
+  if (error) {
+    console.error(error)
+    alert('Erreur lors de la mise à jour du statut')
+    return
+  }
+
+  // Mise à jour locale instantanée (UX fluide)
+  const article = articles.value.find(a => a.id === articleId)
+  if (article) article.status = newStatus
+}
+ 
 const fetchModules = async () => {
   const { data } = await client.from('modules').select('*').eq('active', true)
   allModules.value = data || []
@@ -304,9 +335,32 @@ onMounted(() => {
   color: var(--primary);
 }
 
-.btn-favorite.is-favorite {
-  color: #ff4757;
+.status-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
+
+/* Select invisible MAIS actif */
+.status-select-hidden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  opacity: 0;
+  cursor: pointer;
+
+  z-index: 2;
+
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

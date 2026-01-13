@@ -17,10 +17,10 @@
       <!-- Main Content Column -->
       <div class="main-column">
         <header class="article-header">
-           <NuxtLink to="/dashboard" class="back-link">
+           <a @click="goBack" class="back-link">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Retour au Dashboard
-          </NuxtLink>
+            Retour
+          </a>
            
            <div class="title-section">
              <h1 class="article-title">{{ article.original_title }}</h1>
@@ -128,9 +128,11 @@
 
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { useRouter } from 'vue-router';
 
 const route = useRoute()
 const client = useSupabaseClient()
+const router = useRouter();
 const articleId = route.params.id
 
 // Fetch article and its versions in a single query
@@ -196,6 +198,10 @@ const copyContent = () => {
         }, 2000)
     }
 }
+
+const goBack = () => {
+  router.back();
+};
 </script>
 
 <style scoped>
