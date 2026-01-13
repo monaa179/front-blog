@@ -42,10 +42,10 @@
           >
             <td>
               <div class="article-info">
-                <div class="article-title">
-                  <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
-                  <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
-                </div>
+                  <div class="title-with-favorite">
+                    <a href="#" @click.stop.prevent="goToArticle(article.id)">{{ article.original_title }}</a>
+                    <span v-if="article.versions_count > 0" class="version-badge">{{ article.versions_count }}</span>
+                  </div>
               </div>
             </td>
             <td>
@@ -159,6 +159,9 @@ interface Article {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const articles = ref<Article[]>([])
+
+// Use shared articles composable to fetch articles (modules + versions)
+const { articles: fetchedArticles, loading: articlesLoading, error: articlesError, fetch: fetchArticles } = useArticles({ order: { column: 'created_at', ascending: false } })
 const allModules = ref<Module[]>([])
 const processingId = ref<number | null>(null)
 
@@ -177,43 +180,13 @@ const fetchModules = async () => {
   else allModules.value = (data as any[]) || []
 }
 
-const fetchArticles = async () => {
-  loading.value = true
-  // Fetch articles with modules and the latest version
-  const { data, error: err } = await client
-    .from('articles')
-    .select(`
-      *,
-      article_modules (
-        module:modules (*)
-      ),
-      article_versions (
-        content,
-        created_at
-      )
-    `)
-    .order('created_at', { ascending: false })
-
-  if (err) {
-    error.value = err.message
-  } else {
-    articles.value = (data as any[]).map(article => {
-      // Pick the latest version content if available
-      const versions = article.article_versions || []
-      const lastVersion = versions.length > 0 
-        ? versions.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
-        : null
-
-      return {
-        ...article,
-        modules: article.article_modules ? article.article_modules.map((am: any) => am.module) : [],
-        last_version_content: lastVersion?.content || null,
-        versions_count: versions.length || 0
-      }
-    })
-  }
-  loading.value = false
-}
+// fetchArticles provided by useArticles; keep local articles in sync
+watchEffect(() => {
+  articles.value = (fetchedArticles.value || [])
+  // Bubble up loading/error states
+  loading.value = articlesLoading.value
+  error.value = articlesError.value
+})
 
 const updateStatus = async (id: number, newStatus: string) => {
   const article = articles.value.find(a => a.id === id)
@@ -477,6 +450,39 @@ onMounted(() => {
   color: var(--text-muted);
 }
 
+.title-with-favorite {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-favorite {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-favorite:hover {
+  transform: scale(1.1);
+  color: var(--primary);
+}
+
+.btn-favorite.is-favorite {
+  color: #ff4757; /* A nice red for favorites */
+}
+
+.btn-favorite svg {
+  width: 16px;
+  height: 16px;
+}
+
 .article-desc {
   font-size: 13px;
   color: var(--text-muted);
@@ -554,6 +560,20 @@ onMounted(() => {
   border-top-color: #fff;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.loader-xs {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 71, 87, 0.3);
+  border-top-color: #ff4757;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.btn-favorite:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .btn-icon-only {
