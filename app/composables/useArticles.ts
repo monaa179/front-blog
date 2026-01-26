@@ -1,8 +1,9 @@
 import { ref } from 'vue'
+import type { Article, Module } from '@/types/article'
 
 /**
  * useArticles
- * Fetch articles with modules and versions. Reusable between Dashboard, Favorites, Library.
+ * Fetch articles with modules and versions. Reusable between Dashboard and Library.
  * Options:
  *  - statuses: string[] optional list of statuses to filter
  *  - order: { column: string, ascending: boolean }
@@ -12,9 +13,10 @@ export const useArticles = (
 ) => {
   const client = useSupabaseClient()
 
-  const articles = ref<any[]>([])
+  const articles = ref<Article[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const allModules = ref<Module[]>([])
 
   /* ===========================
      FETCH ARTICLES (LIST)
@@ -51,9 +53,9 @@ export const useArticles = (
         const versions = article.article_versions || []
         const lastVersion = versions.length
           ? versions.sort(
-              (a: any, b: any) =>
-                new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-            )[0]
+            (a: any, b: any) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )[0]
           : null
 
         return {
@@ -62,6 +64,7 @@ export const useArticles = (
             ? article.article_modules.map((am: any) => am.module)
             : [],
           last_version_content: lastVersion?.content || null,
+          last_version_at: lastVersion?.created_at || article.created_at,
           last_version_created_at: lastVersion?.created_at || article.created_at,
           versions_count: versions.length || 0
         }
@@ -72,6 +75,74 @@ export const useArticles = (
     } finally {
       loading.value = false
     }
+  }
+
+  /* ===========================
+     SHARED ACTIONS
+  =========================== */
+  const deleteArticle = async (id: number) => {
+    const { error: err } = await client.from('articles').delete().eq('id', id)
+    if (err) {
+      console.error('[useArticles] delete error', err)
+      return false
+    }
+    articles.value = articles.value.filter(a => a.id !== id)
+    return true
+  }
+
+  const archiveArticle = async (id: number) => {
+    const { error: err } = await (client.from('articles') as any).update({ status: 'abandoned' }).eq('id', id)
+    if (err) {
+      console.error('[useArticles] archive error', err)
+      return false
+    }
+    articles.value = articles.value.filter(a => a.id !== id)
+    return true
+  }
+
+  const updateStatus = async (id: number, newStatus: string) => {
+    const { error: err } = await (client.from('articles') as any).update({ status: newStatus }).eq('id', id)
+    if (err) {
+      console.error('[useArticles] updateStatus error', err)
+      return false
+    }
+    const article = articles.value.find(a => a.id === id)
+    if (article) article.status = newStatus
+    return true
+  }
+
+  const fetchModules = async () => {
+    const { data, error: err } = await client.from('modules').select('*').eq('active', true)
+    if (err) {
+      console.error('[useArticles] fetchModules error', err)
+      return
+    }
+    allModules.value = data || []
+  }
+
+  const updateModules = async (articleId: number, newModules: Module[]) => {
+    const { error: deleteErr } = await client.from('article_modules').delete().eq('article_id', articleId)
+    if (deleteErr) {
+      console.error('[useArticles] updateModules delete error', deleteErr)
+      return false
+    }
+
+    if (newModules.length > 0) {
+      const insertData = newModules.map(m => ({
+        article_id: articleId,
+        module_id: m.id
+      }))
+
+      const { error: insertErr } = await client.from('article_modules').insert(insertData as any)
+      if (insertErr) {
+        console.error('[useArticles] updateModules insert error', insertErr)
+        return false
+      }
+    }
+
+    const article = articles.value.find(a => a.id === articleId)
+    if (article) article.modules = newModules
+    return true
   }
 
   /* ===========================
@@ -94,7 +165,8 @@ export const useArticles = (
       if (error) throw error
 
       data.forEach(article => {
-        switch (article.status?.toLowerCase()) {
+        const status = (article as any).status?.toLowerCase()
+        switch (status) {
           case 'proposed':
             stats.proposed++
             break
@@ -123,7 +195,13 @@ export const useArticles = (
     articles,
     loading,
     error,
+    allModules,
     fetch,
     fetchArticleStats,
+    deleteArticle,
+    updateStatus,
+    fetchModules,
+    updateModules,
+    archiveArticle
   }
 }

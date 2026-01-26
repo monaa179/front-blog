@@ -1,41 +1,36 @@
 <template>
   <div class="dashboard-stats">
-    <h1 class="title">Statistiques des Articles</h1>
-
-    <div class="stats-container">
-      <div class="stat-box">
-        <h2>Proposé</h2>
-        <p>{{ stats.proposed }}</p>
+    <header class="page-header">
+      <div class="header-text">
+        <h1>Statistiques</h1>
+        <p class="subtitle">Vue d'ensemble de votre production de contenu.</p>
       </div>
+    </header>
 
-      <div class="stat-box">
-        <h2>Validé</h2>
-        <p>{{ stats.validated }}</p>
-      </div>
-
-      <div class="stat-box">
-        <h2>Publié</h2>
-        <p>{{ stats.published }}</p>
-      </div>
-
-      <div class="stat-box">
-        <h2>Abandonné</h2>
-        <p>{{ stats.abandoned }}</p>
-      </div>
-
-      <div class="stat-box written">
-        <h2>Rédigé</h2>
-        <p>{{ stats.written }}</p>
+    <div class="stats-grid">
+      <div v-for="(val, key) in statConfig" :key="key" class="stat-card glass-panel" :class="key">
+        <div class="card-inner">
+          <div class="stat-info">
+            <span class="stat-label">{{ val.label }}</span>
+            <span class="stat-value">{{ stats[key] || 0 }}</span>
+          </div>
+          <div class="stat-icon-box" :style="{ color: val.color, background: val.bg }">
+            <component :is="val.icon" />
+          </div>
+        </div>
+        <div class="stat-progress">
+          <div class="progress-bar" :style="{ width: getPercentage(key) + '%', background: val.color }"></div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useArticles } from '@/composables/useArticles'
 
-const stats = ref({
+const stats = ref<Record<string, number>>({
   proposed: 0,
   validated: 0,
   published: 0,
@@ -45,69 +40,123 @@ const stats = ref({
 
 const { fetchArticleStats } = useArticles()
 
+// Simple SVG Icons as components
+const IconProposed = () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('circle', { cx: '12', cy: '12', r: '10' }), h('line', { x1: '12', y1: '8', x2: '12', y2: '12' }), h('line', { x1: '12', y1: '16', x2: '12.01', y2: '16' })])
+const IconValidated = () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('polyline', { points: '20 6 9 17 4 12' })])
+const IconPublished = () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('path', { d: 'M5 12h14' }), h('path', { d: 'M12 5v14' })]) // Placeholder for "Globe" or something
+const IconWritten = () => h('svg', { xmlns: 'http://www.w3.org/2000/svg', width: '20', height: '20', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, [h('path', { d: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7' }), h('path', { d: 'M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z' })])
+
+const statConfig = {
+  proposed: { label: 'En attente', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', icon: IconProposed },
+  validated: { label: 'Validés', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', icon: IconValidated },
+  written: { label: 'Rédigés', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', icon: IconWritten },
+  published: { label: 'Publiés', color: '#6366f1', bg: 'rgba(99, 102, 241, 0.1)', icon: IconPublished }
+}
+
+const totalArticles = computed(() => {
+  return Object.values(stats.value).reduce((a, b) => a + b, 0) || 1
+})
+
+const getPercentage = (key: string) => {
+  return ((stats.value[key] || 0) / totalArticles.value) * 100
+}
+
 onMounted(async () => {
-  stats.value = await fetchArticleStats()
+  const res = await fetchArticleStats()
+  if (res) stats.value = res
 })
 </script>
 
 <style scoped>
 .dashboard-stats {
-  padding: 32px;
-  background-color: #0e0e0e;
-  min-height: 100vh;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.title {
-  font-size: 20px;
-  font-weight: 500;
-  color: #eaeaea;
-  margin-bottom: 24px;
+.page-header {
+  margin-bottom: 48px;
 }
 
-.stats-container {
+.header-text h1 {
+  font-size: 32px;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 15px;
+}
+
+.stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
 }
 
-.stat-box {
-  background-color: #161616;
-  border-radius: 10px;
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
+  gap: 20px;
+  transition: all 0.25s var(--ease-out);
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  background: var(--bg-card-hover);
+  border-color: var(--border-active);
+  box-shadow: var(--shadow-lg);
+}
+
+.card-inner {
+  display: flex;
   justify-content: space-between;
-  transition: background 0.2s ease, border 0.2s ease;
+  align-items: flex-start;
 }
 
-.stat-box:hover {
-  background-color: #1b1b1b;
-  border-color: rgba(255, 255, 255, 0.1);
+.stat-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.stat-box h2 {
+.stat-label {
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #9a9a9a;
-  margin: 0;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
 }
 
-.stat-box p {
-  font-size: 32px;
-  font-weight: 600;
-  margin: 12px 0 0;
-  color: #d44d5b;
+.stat-value {
+  font-size: 36px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
-/* Carte ÉCRIT (différenciée) */
-.stat-box.written {
-  border-color: rgba(143, 211, 166, 0.25);
+.stat-icon-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.stat-box.written p {
-  color: #8fd3a6;
+.stat-progress {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease-out;
 }
 </style>

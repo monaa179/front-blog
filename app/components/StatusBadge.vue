@@ -13,7 +13,6 @@ const props = defineProps<{
 const statusLabel = computed(() => {
   const map: Record<string, string> = {
     proposed: 'Proposé',
-    writing: 'Rédaction...',
     written: 'Rédigé',
     validated: 'Validé',
     published: 'Publié',
@@ -55,16 +54,6 @@ const statusClass = computed(() => `status-${props.status.toLowerCase()}`)
 }
 .status-proposed .status-dot { background: var(--text-muted); }
 
-.status-writing {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-.status-writing .status-dot { 
-  background: var(--color-warning); 
-  animation: pulse 1.5s infinite;
-}
-
 .status-written {
   background: var(--color-success-bg);
   color: var(--color-success);
@@ -100,10 +89,4 @@ const statusClass = computed(() => `status-${props.status.toLowerCase()}`)
   text-decoration: line-through;
 }
 .status-abandoned .status-dot { background: var(--text-muted); }
-
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.5; }
-  100% { transform: scale(1); opacity: 1; }
-}
 </style>

@@ -100,28 +100,17 @@
       </table>
     </div>
 
-    <!-- Modal Confirmation -->
-    <transition name="fade">
-      <div v-if="userToDelete" class="modal-overlay" @click.self="userToDelete = null">
-        <div class="modal card">
-          <div class="modal-header">
-            <h3>Supprimer l'utilisateur</h3>
-            <button class="btn-close" @click="userToDelete = null">×</button>
-          </div>
-          <div class="modal-body">
-            <p>Êtes-vous sûr de vouloir supprimer <strong>{{ userToDelete.email }}</strong> ?</p>
-            <p class="warning">Cette action supprimera également son compte d'authentification Nuxt/Supabase. C'est irréversible.</p>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-outline" @click="userToDelete = null">Annuler</button>
-            <button class="btn btn-danger-solid" @click="handleDeleteUser" :disabled="deleting">
-              <span v-if="deleting">Suppression...</span>
-              <span v-else>Supprimer définitivement</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <!-- Confirm Modal -->
+    <ConfirmModal
+      :is-open="!!userToDelete"
+      title="Supprimer l'utilisateur"
+      :description="userToDelete ? `Êtes-vous sûr de vouloir supprimer ${userToDelete.email} ? Cette action est irréversible.` : ''"
+      confirm-label="Supprimer définitivement"
+      type="danger"
+      :loading="deleting"
+      @cancel="userToDelete = null"
+      @confirm="handleDeleteUser"
+    />
 
     <!-- Toasts Notifications -->
     <div class="toasts">
@@ -147,6 +136,7 @@ import {
 } from 'lucide-vue-next'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 
 definePageMeta({
   middleware: 'admin',
@@ -441,82 +431,6 @@ onMounted(() => {
   text-align: center;
   padding: var(--spacing-2xl) !important;
   color: var(--text-muted);
-}
-
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal {
-  width: 100%;
-  max-width: 450px;
-  padding: 0;
-  border-top: 3px solid var(--color-error);
-}
-
-.modal-header {
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-bottom: 1px solid var(--border-subtle);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-body {
-  padding: var(--spacing-lg);
-}
-
-.warning {
-  color: var(--color-error);
-  font-size: 13px;
-  background: var(--color-error-bg);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-md);
-  margin-top: var(--spacing-md);
-}
-
-.modal-actions {
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: rgba(255, 255, 255, 0.01);
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--spacing-md);
-  border-top: 1px solid var(--border-subtle);
-}
-
-.btn-danger-solid {
-  background-color: var(--color-error);
-  color: white;
-  border: none;
-  padding: 0 var(--spacing-md);
-  height: 32px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.btn-danger-solid:hover {
-  background-color: #b93d4b;
-}
-
-.btn-close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-size: 24px;
-  cursor: pointer;
-  line-height: 1;
 }
 
 /* Toast Styles */
