@@ -67,12 +67,14 @@
     <ConfirmModal
       :is-open="isConfirmOpen"
       title="Refuser le sujet"
-      description="Voulez-vous vraiment refuser ce sujet ? Il sera envoyé à l'archive."
-      confirm-label="Refuser"
-      type="warning"
+      description="Voulez-vous archiver cet article ou le supprimer définitivement ?"
+      confirm-label="Supprimer définitivement"
+      type="danger"
       :loading="actionLoading"
+      show-archive
       @cancel="closeConfirm"
-      @confirm="handleRefuse"
+      @confirm="handleDeleteDefinitely"
+      @confirm-archive="handleArchive"
     />
   </div>
 </template>
@@ -85,7 +87,15 @@ import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const router = useRouter()
 
-const { articles, loading, error, fetch, updateStatus } = useArticles({ 
+const { 
+  articles, 
+  loading, 
+  error, 
+  fetch, 
+  updateStatus,
+  archiveArticle: archiveArticleAction,
+  deleteArticle: deleteArticleAction
+} = useArticles({ 
   statuses: ['proposed'],
   order: { column: 'created_at', ascending: false } 
 })
@@ -112,10 +122,21 @@ const closeConfirm = () => {
   actionLoading.value = false
 }
 
-const handleRefuse = async () => {
+const handleArchive = async () => {
   if (!articleIdToRefuse.value) return
   actionLoading.value = true
-  const success = await updateStatus(articleIdToRefuse.value, 'abandoned')
+  const success = await archiveArticleAction(articleIdToRefuse.value)
+  if (success) {
+    closeConfirm()
+  } else {
+    actionLoading.value = false
+  }
+}
+
+const handleDeleteDefinitely = async () => {
+  if (!articleIdToRefuse.value) return
+  actionLoading.value = true
+  const success = await deleteArticleAction(articleIdToRefuse.value)
   if (success) {
     closeConfirm()
   } else {

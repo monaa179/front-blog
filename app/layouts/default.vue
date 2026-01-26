@@ -137,12 +137,14 @@ const handleLogout = async () => {
 }
 
 .nav-label {
-  padding: 0 12px 8px;
+  padding: 0px 12px 4px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-muted);
+  font-family: 'Inter', sans-serif !important;
+  display: block;
 }
 
 .nav-links {

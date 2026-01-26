@@ -143,14 +143,36 @@ defineEmits<{
 
 .modal-footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+  margin-top: 8px;
 }
 
 .action-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+@media (max-width: 480px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  
+  .action-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .btn-danger {

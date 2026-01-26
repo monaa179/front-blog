@@ -58,33 +58,15 @@
             >
               <template #actions>
                 <button 
-                  v-if="col.id === 'validated' || col.id === 'toWrite'"
+                  v-if="col.id === 'validated'"
                   class="btn btn-primary btn-sm btn-full" 
                   @click.stop="handleWrite(article)"
                   :disabled="processingId === article.id"
                 >
                   <div v-if="processingId === article.id" class="loader-sm"></div>
-                  <span>{{ getWriteButtonText(article, col.id) }}</span>
+                  <span>{{ getWriteButtonText(article) }}</span>
                 </button>
 
-                <button 
-                  v-if="col.id === 'validated'"
-                  class="btn btn-outline btn-sm btn-full btn-passer" 
-                  @click.stop="updateStatus(article.id, 'to_write')"
-                >
-                  <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
-                  <span>Passer en rédaction</span>
-                </button>
-
-                <template v-if="col.id === 'toWrite'">
-                  <button 
-                    class="btn btn-ghost btn-sm btn-square" 
-                    @click.stop="updateStatus(article.id, 'validated')"
-                    title="Retour vers Validé"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-                  </button>
-                </template>
 
                 <template v-if="col.id === 'written'">
                   <button 
@@ -93,7 +75,7 @@
                     :disabled="processingId === article.id"
                   >
                     <div v-if="processingId === article.id" class="loader-sm"></div>
-                    <span>{{ getWriteButtonText(article, col.id) }}</span>
+                    <span>{{ getWriteButtonText(article) }}</span>
                   </button>
                   <button class="btn btn-ghost btn-sm btn-square" @click.stop="copyContent(article)" title="Copier le contenu">
                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -181,14 +163,8 @@ const columns = computed(() => [
   {
     id: 'validated',
     title: 'Idées Validées',
-    articles: filteredArticles.value.filter(a => a.status === 'validated'),
+    articles: filteredArticles.value.filter(a => a.status === 'validated' || a.status === 'to_write'),
     emptyMessage: 'Aucune idée validée.'
-  },
-  {
-    id: 'toWrite',
-    title: 'En Rédaction',
-    articles: filteredArticles.value.filter(a => a.status === 'to_write'),
-    emptyMessage: 'Rien en cours.'
   },
   {
     id: 'written',
@@ -204,10 +180,10 @@ const columns = computed(() => [
   }
 ])
 
-const getWriteButtonText = (article: Article, columnId: string) => {
+const getWriteButtonText = (article: Article) => {
   if (processingId.value === article.id) return 'Lancement...'
-  if (columnId === 'validated') return 'Lancer la rédaction'
-  return 'Relancer'
+  if (article.versions_count && article.versions_count > 0) return 'Relancer'
+  return 'Lancer la rédaction'
 }
 
 const copyContent = (article: Article) => {
@@ -262,7 +238,7 @@ const onDrop = async (event: DragEvent, columnId: string) => {
 
   try {
     const article = JSON.parse(data) as Article
-    const newStatus = columnId === 'toWrite' ? 'to_write' : columnId
+    const newStatus = columnId
     
     // Don't update if same column
     if (article.status === newStatus) return
@@ -426,7 +402,6 @@ onMounted(() => {
 }
 
 .status-dot.validated { background: var(--color-info); }
-.status-dot.toWrite { background: var(--primary); }
 .status-dot.written { background: var(--color-success); }
 .status-dot.published { background: var(--text-muted); }
 
