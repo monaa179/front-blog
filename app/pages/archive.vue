@@ -74,7 +74,7 @@ import LoadingState from '@/components/LoadingState.vue';
 import ArticleTableRow from '@/components/ArticleTableRow.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 
-const { articles, fetch, loading, error, deleteArticle: apiDeleteArticle, updateStatus } = useArticles({ statuses: ['abandoned'] });
+const { articles, fetch, loading, error, deleteArticle: apiDeleteArticle, updateStatus } = useArticles({ statuses: ['abandoned', 'error'] });
 
 const restoreArticle = async (id: number) => {
   await updateStatus(id, 'validated');

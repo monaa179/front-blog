@@ -28,7 +28,16 @@
       <LoadingState v-if="loading" message="Chargement de vos articles..." />
 
       <div v-else class="kanban-board">
-        <div v-for="col in columns" :key="col.id" class="kanban-column" :class="col.id">
+        <div 
+          v-for="col in columns" 
+          :key="col.id" 
+          class="kanban-column" 
+          :class="[col.id, { 'drag-over': activeDropZone === col.id }]"
+          @dragover.prevent
+          @dragenter="onDragEnter(col.id)"
+          @dragleave="onDragLeave"
+          @drop="onDrop($event, col.id)"
+        >
           <div class="column-header">
             <div class="column-title-group">
               <div class="status-dot" :class="col.id"></div>
@@ -58,6 +67,15 @@
                   <span>{{ getWriteButtonText(article, col.id) }}</span>
                 </button>
 
+                <button 
+                  v-if="col.id === 'validated'"
+                  class="btn btn-outline btn-sm btn-full btn-passer" 
+                  @click.stop="updateStatus(article.id, 'to_write')"
+                >
+                  <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                  <span>Passer en rédaction</span>
+                </button>
+
                 <template v-if="col.id === 'toWrite'">
                   <button 
                     class="btn btn-ghost btn-sm btn-square" 
@@ -70,12 +88,12 @@
 
                 <template v-if="col.id === 'written'">
                   <button 
-                    class="btn btn-outline btn-sm btn-full" 
+                    class="btn btn-primary btn-sm btn-full" 
                     @click.stop="handleWrite(article)"
                     :disabled="processingId === article.id"
                   >
                     <div v-if="processingId === article.id" class="loader-sm"></div>
-                    <span>{{ (processingId === article.id) ? 'Lancement...' : 'Re-rédiger' }}</span>
+                    <span>{{ getWriteButtonText(article, col.id) }}</span>
                   </button>
                   <button class="btn btn-ghost btn-sm btn-square" @click.stop="copyContent(article)" title="Copier le contenu">
                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -135,6 +153,8 @@ const confirmTitle = ref('Supprimer l\'article')
 const confirmDescription = ref('Voulez-vous archiver cet article ou le supprimer définitivement ?')
 const confirmLabel = ref('Supprimer définitivement')
 
+const activeDropZone = ref<string | null>(null)
+
 const { 
   articles, 
   loading, 
@@ -146,7 +166,7 @@ const {
   updateStatus,
   updateModules
 } = useArticles({ 
-  statuses: ['validated', 'written', 'published', 'error'], 
+  statuses: ['validated', 'written', 'published', 'to_write'], 
   order: { column: 'created_at', ascending: false } 
 })
 
@@ -167,7 +187,7 @@ const columns = computed(() => [
   {
     id: 'toWrite',
     title: 'En Rédaction',
-    articles: filteredArticles.value.filter(a => ['error'].includes(a.status)),
+    articles: filteredArticles.value.filter(a => a.status === 'to_write'),
     emptyMessage: 'Rien en cours.'
   },
   {
@@ -185,7 +205,7 @@ const columns = computed(() => [
 ])
 
 const getWriteButtonText = (article: Article, columnId: string) => {
-  if (processingId.value === article.id) return 'Envoi...'
+  if (processingId.value === article.id) return 'Lancement...'
   if (columnId === 'validated') return 'Lancer la rédaction'
   return 'Relancer'
 }
@@ -220,6 +240,36 @@ const handleWrite = async (article: Article) => {
     console.error(e)
   } finally {
     processingId.value = null
+  }
+}
+
+/* ===========================
+   DRAG & DROP HANDLERS
+=========================== */
+const onDragEnter = (columnId: string) => {
+  activeDropZone.value = columnId
+}
+
+const onDragLeave = () => {
+  activeDropZone.value = null
+}
+
+const onDrop = async (event: DragEvent, columnId: string) => {
+  activeDropZone.value = null
+  
+  const data = event.dataTransfer?.getData('application/json')
+  if (!data) return
+
+  try {
+    const article = JSON.parse(data) as Article
+    const newStatus = columnId === 'toWrite' ? 'to_write' : columnId
+    
+    // Don't update if same column
+    if (article.status === newStatus) return
+
+    await updateStatus(article.id, newStatus)
+  } catch (e) {
+    console.error('Drop error:', e)
   }
 }
 
@@ -345,6 +395,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   max-height: 100%;
+  transition: all 0.2s ease;
+}
+
+.kanban-column.drag-over {
+  background: rgba(var(--primary-rgb, 99, 102, 241), 0.05);
+  border-color: var(--primary);
+  transform: scale(1.01);
 }
 
 .column-header {
@@ -402,6 +459,23 @@ onMounted(() => {
 
 .btn-full { flex: 1; }
 .btn-square { width: 34px; padding: 0; flex-shrink: 0; }
+
+.btn-passer {
+  color: var(--primary);
+  background: rgba(var(--primary-rgb, 99, 102, 241), 0.08);
+  border: 1px solid rgba(var(--primary-rgb, 99, 102, 241), 0.3);
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 8px 12px;
+  height: auto;
+  line-height: 1.2;
+}
+
+.btn-passer:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: var(--border-muted);
+}
 
 .empty-column {
   padding: 40px 20px;

@@ -1,7 +1,13 @@
 <template>
   <div 
     class="article-card" 
-    :class="{ published: article.status === 'published' }"
+    :class="{ 
+      published: article.status === 'published',
+      dragging: isDragging 
+    }"
+    draggable="true"
+    @dragstart="handleDragStart"
+    @dragend="isDragging = false"
     @click="$emit('click', article)"
   >
     <div class="card-header">
@@ -39,7 +45,7 @@ import type { Article, Module } from '@/types/article'
 import { formatLibraryDate } from '@/utils/date'
 import ModuleSelector from './ModuleSelector.vue'
 
-defineProps<{
+const props = defineProps<{
   article: Article
   availableModules: Module[]
 }>()
@@ -49,6 +55,16 @@ defineEmits<{
   (e: 'delete', id: number): void
   (e: 'update-modules', id: number, modules: Module[]): void
 }>()
+
+const isDragging = ref(false)
+
+const handleDragStart = (event: DragEvent) => {
+  isDragging.value = true
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('application/json', JSON.stringify(props.article))
+  }
+}
 </script>
 
 <style scoped>
@@ -134,12 +150,18 @@ defineEmits<{
 
 .card-actions {
   display: flex;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 10px;
   padding-top: 16px;
   border-top: 1px solid var(--border-subtle);
 }
 
 .article-card.published {
   border-left: 3px solid var(--color-success);
+}
+
+.article-card.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
 }
 </style>
