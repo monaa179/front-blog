@@ -13,12 +13,12 @@ const props = defineProps<{
 const statusLabel = computed(() => {
   const map: Record<string, string> = {
     proposed: 'Proposé',
-    writing: 'Rédaction...',
     written: 'Rédigé',
     validated: 'Validé',
     published: 'Publié',
     error: 'Erreur',
-    abandoned: 'Abandonné'
+    abandoned: 'Abandonné',
+    to_write: 'À rédiger'
   }
   return map[props.status] || props.status
 })
@@ -54,16 +54,6 @@ const statusClass = computed(() => `status-${props.status.toLowerCase()}`)
   border-color: var(--border-subtle);
 }
 .status-proposed .status-dot { background: var(--text-muted); }
-
-.status-writing {
-  background: var(--color-warning-bg);
-  color: var(--color-warning);
-  border-color: rgba(245, 158, 11, 0.2);
-}
-.status-writing .status-dot { 
-  background: var(--color-warning); 
-  animation: pulse 1.5s infinite;
-}
 
 .status-written {
   background: var(--color-success-bg);
@@ -101,9 +91,10 @@ const statusClass = computed(() => `status-${props.status.toLowerCase()}`)
 }
 .status-abandoned .status-dot { background: var(--text-muted); }
 
-@keyframes pulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.3); opacity: 0.5; }
-  100% { transform: scale(1); opacity: 1; }
+.status-to_write {
+  background: rgba(168, 85, 247, 0.1);
+  color: #a855f7;
+  border-color: rgba(168, 85, 247, 0.2);
 }
+.status-to_write .status-dot { background: #a855f7; }
 </style>

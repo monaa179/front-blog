@@ -1,113 +1,155 @@
 <template>
   <div class="library-page">
-    <div class="page-header">
-      <div class="header-text">
-        <h1>Bibliothèque</h1>
-        <p class="subtitle">Consultez l'historique complet de vos rédactions.</p>
-      </div>
-      
-      <div class="header-filters">
-        <div class="filter-group">
-          <label>Module</label>
-          <select v-model="selectedModuleId" class="filter-select">
-            <option :value="null">Tous les modules</option>
-            <option v-for="mod in allModules" :key="mod.id" :value="mod.id">
-              {{ mod.name }}
-            </option>
-          </select>
+    <header class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1>Bibliothèque</h1>
+          <p class="subtitle">Gerez la rédaction et la publication de vos contenus.</p>
+        </div>
+        
+        <div class="header-actions">
+          <div class="filter-wrapper">
+            <label class="sr-only">Filtrer par module</label>
+            <div class="select-container">
+              <svg class="select-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9v6l4 2v-8L22 3z"></path></svg>
+              <select v-model="selectedModuleId" class="minimal-select">
+                <option :value="null">Tous les modules</option>
+                <option v-for="mod in allModules" :key="mod.id" :value="mod.id">
+                  {{ mod.name }}
+                </option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </header>
 
-    <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
-      <span>Chargement de la bibliothèque...</span>
-    </div>
+    <div class="board-container">
+      <LoadingState v-if="loading" message="Chargement de vos articles..." />
 
-    <div v-else-if="filteredArticles.length === 0" class="empty-library">
-      <div class="empty-icon">📚</div>
-      <h3>Aucun article trouvé</h3>
-      <p v-if="selectedModuleId">Aucun article ne correspond à ce module.</p>
-      <p v-else>Vous n'avez pas encore d'articles rédigés.</p>
-    </div>
-
-    <div v-else class="library-container">
-      <div class="library-grid">
+      <div v-else class="kanban-board">
         <div 
-          v-for="article in filteredArticles" 
-          :key="article.id" 
-          class="library-card"
-          @click="router.push(`/articles/${article.id}`)"
+          v-for="col in columns" 
+          :key="col.id" 
+          class="kanban-column" 
+          :class="[col.id, { 'drag-over': activeDropZone === col.id }]"
+          @dragover.prevent
+          @dragenter="onDragEnter(col.id)"
+          @dragleave="onDragLeave"
+          @drop="onDrop($event, col.id)"
         >
-          <div class="card-header">
-            <div class="card-title-group">
-              <h4 class="card-title">{{ article.original_title }}</h4>
-              <span class="card-date">{{ formatLibraryDate(article.last_version_at) }}</span>
+          <div class="column-header">
+            <div class="column-title-group">
+              <div class="status-dot" :class="col.id"></div>
+              <h3>{{ col.title }}</h3>
             </div>
-            <StatusBadge :status="article.status" />
+            <span class="count-badge">{{ col.articles.length }}</span>
           </div>
           
-          <p class="card-desc">{{ article.original_description }}</p>
-          
-          <div class="card-footer">
-            <div class="card-modules">
-              <span v-for="mod in article.modules" :key="mod.id" class="mini-tag">
-                {{ mod.name }}
-              </span>
+          <div class="column-content scroll-y">
+            <ArticleCard
+              v-for="article in col.articles"
+              :key="article.id"
+              :article="article"
+              :available-modules="allModules"
+              @click="router.push(`/articles/${article.id}`)"
+              @delete="openDeleteConfirm"
+              @update-modules="updateModules"
+            >
+              <template #actions>
+                <button 
+                  v-if="col.id === 'validated'"
+                  class="btn btn-primary btn-sm btn-full" 
+                  @click.stop="handleWrite(article)"
+                  :disabled="processingId === article.id"
+                >
+                  <div v-if="processingId === article.id" class="loader-sm"></div>
+                  <span>{{ getWriteButtonText(article) }}</span>
+                </button>
+
+
+                <template v-if="col.id === 'written'">
+                  <button 
+                    class="btn btn-primary btn-sm btn-full" 
+                    @click.stop="handleWrite(article)"
+                    :disabled="processingId === article.id"
+                  >
+                    <div v-if="processingId === article.id" class="loader-sm"></div>
+                    <span>{{ getWriteButtonText(article) }}</span>
+                  </button>
+                  <button class="btn btn-ghost btn-sm btn-square" @click.stop="copyContent(article)" title="Copier le contenu">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
+                </template>
+
+                <template v-if="col.id === 'published'">
+                  <button class="btn btn-ghost btn-sm btn-full" @click.stop="copyContent(article)">
+                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                     Copier
+                  </button>
+                </template>
+              </template>
+            </ArticleCard>
+
+            <div v-if="col.articles.length === 0" class="empty-column">
+              <div class="empty-icon">✨</div>
+              <p>{{ col.emptyMessage }}</p>
             </div>
-             <div class="card-actions">
-               <!-- Favorites removed: no favorite button -->
-               <button class="btn btn-ghost btn-sm btn-icon-only" @click.stop="copyContent(article)">
-                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-               </button>
-             </div>
+            </div>
           </div>
-        </div>
       </div>
     </div>
+    <ConfirmModal
+      :is-open="isConfirmOpen"
+      :title="confirmTitle"
+      :description="confirmDescription"
+      :confirm-label="confirmLabel"
+      type="danger"
+      :loading="actionLoading"
+      show-archive
+      @cancel="closeConfirm"
+      @confirm="handleDeleteDefinitely"
+      @confirm-archive="handleArchive"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { format } from 'date-fns'
-import { fr } from 'date-fns/locale'
+import { useArticles } from '@/composables/useArticles'
+import type { Article } from '@/types/article'
+import LoadingState from '@/components/LoadingState.vue'
+import ArticleCard from '@/components/ArticleCard.vue'
+import ConfirmModal from '@/components/ConfirmModal.vue'
 
 const client = useSupabaseClient()
 const router = useRouter()
 
-interface Article {
-  id: number;
-  original_title: string;
-  original_description: string;
-  status: string;
-  created_at: string;
-  last_version_at: string | null;
-  last_version_content: string | null;
-  modules: any[];
-}
-
-const loading = ref(true)
-const articles = ref<Article[]>([])
-const allModules = ref<any[]>([])
 const selectedModuleId = ref<number | null>(null)
+const processingId = ref<number | null>(null)
 
-const fetchModules = async () => {
-  const { data } = await client.from('modules').select('*').eq('active', true)
-  allModules.value = data || []
-}
+// Modal State
+const isConfirmOpen = ref(false)
+const articleToProcess = ref<Article | null>(null)
+const actionLoading = ref(false)
+const confirmTitle = ref('Supprimer l\'article')
+const confirmDescription = ref('Voulez-vous archiver cet article ou le supprimer définitivement ?')
+const confirmLabel = ref('Supprimer définitivement')
 
-// Use shared useArticles composable to fetch library articles
-const { articles: fetchedArticles, loading: fetchedLoading, error: fetchedError, fetch: fetchLibraryArticles } = useArticles({ statuses: ['written', 'validated', 'published'], order: { column: 'created_at', ascending: false } })
+const activeDropZone = ref<string | null>(null)
 
-// Keep local articles in sync with fetchedArticles
-watchEffect(() => {
-  articles.value = (fetchedArticles.value || []).map(a => ({
-    ...a,
-    // map last_version_created_at -> last_version_at for backward compatibility
-    last_version_at: a.last_version_created_at || a.created_at,
-    last_version_content: a.last_version_content || null
-  }))
-  loading.value = fetchedLoading.value
+const { 
+  articles, 
+  loading, 
+  allModules,
+  fetch: fetchLibraryArticles,
+  fetchModules,
+  archiveArticle: archiveArticleAction,
+  deleteArticle: deleteArticleAction,
+  updateStatus,
+  updateModules
+} = useArticles({ 
+  statuses: ['validated', 'written', 'published', 'to_write'], 
+  order: { column: 'created_at', ascending: false } 
 })
 
 const filteredArticles = computed(() => {
@@ -117,15 +159,132 @@ const filteredArticles = computed(() => {
   )
 })
 
-const formatLibraryDate = (dateStr: string | null) => {
-  if (!dateStr) return ''
-  return format(new Date(dateStr), 'd MMMM yyyy', { locale: fr })
+const columns = computed(() => [
+  {
+    id: 'validated',
+    title: 'Idées Validées',
+    articles: filteredArticles.value.filter(a => a.status === 'validated' || a.status === 'to_write'),
+    emptyMessage: 'Aucune idée validée.'
+  },
+  {
+    id: 'written',
+    title: 'Prêt',
+    articles: filteredArticles.value.filter(a => a.status === 'written'),
+    emptyMessage: 'Rien de prêt.'
+  },
+  {
+    id: 'published',
+    title: 'Publié',
+    articles: filteredArticles.value.filter(a => a.status === 'published'),
+    emptyMessage: 'Aucun article publié.'
+  }
+])
+
+const getWriteButtonText = (article: Article) => {
+  if (processingId.value === article.id) return 'Lancement...'
+  if (article.versions_count && article.versions_count > 0) return 'Relancer'
+  return 'Lancer la rédaction'
 }
 
 const copyContent = (article: Article) => {
   if (article.last_version_content) {
     navigator.clipboard.writeText(article.last_version_content)
-    alert('Contenu copié !')
+  }
+}
+
+const handleWrite = async (article: Article) => {
+  processingId.value = article.id
+  try {
+    const { data: vData } = await client.from('article_versions').insert({ article_id: article.id, content: null } as any).select('*')
+    const versionId = (vData as any)?.[0]?.id
+
+    const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q'
+    const res = await fetch(makeWebhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        article_id: article.id, 
+        version_id: versionId,
+        modules: article.modules?.map((m: any) => m.name)
+      })
+    })
+
+    if (!res.ok) {
+      await updateStatus(article.id, 'validated')
+    }
+  } catch (e) {
+    console.error(e)
+  } finally {
+    processingId.value = null
+  }
+}
+
+/* ===========================
+   DRAG & DROP HANDLERS
+=========================== */
+const onDragEnter = (columnId: string) => {
+  activeDropZone.value = columnId
+}
+
+const onDragLeave = () => {
+  activeDropZone.value = null
+}
+
+const onDrop = async (event: DragEvent, columnId: string) => {
+  activeDropZone.value = null
+  
+  const data = event.dataTransfer?.getData('application/json')
+  if (!data) return
+
+  try {
+    const article = JSON.parse(data) as Article
+    const newStatus = columnId
+    
+    // Don't update if same column
+    if (article.status === newStatus) return
+
+    await updateStatus(article.id, newStatus)
+  } catch (e) {
+    console.error('Drop error:', e)
+  }
+}
+
+/* ===========================
+   CONFIRM MODAL HANDLERS
+=========================== */
+const openDeleteConfirm = (id: number) => {
+  const art = articles.value.find(a => a.id === id)
+  if (art) {
+    articleToProcess.value = art
+    isConfirmOpen.value = true
+  }
+}
+
+const closeConfirm = () => {
+  isConfirmOpen.value = false
+  articleToProcess.value = null
+  actionLoading.value = false
+}
+
+const handleArchive = async () => {
+  if (!articleToProcess.value) return
+  actionLoading.value = true
+  const success = await archiveArticleAction(articleToProcess.value.id)
+  if (success) {
+    closeConfirm()
+  } else {
+    actionLoading.value = false
+  }
+}
+
+const handleDeleteDefinitely = async () => {
+  if (!articleToProcess.value) return
+  actionLoading.value = true
+  const success = await deleteArticleAction(articleToProcess.value.id)
+  if (success) {
+    closeConfirm()
+  } else {
+    actionLoading.value = false
   }
 }
 
@@ -136,177 +295,202 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.library-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 96px);
+}
 
 .page-header {
-  margin-bottom: 40px;
+  margin-bottom: 32px;
+}
+
+.header-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
 }
 
 .header-text h1 {
-  font-size: 24px;
+  font-size: 32px;
   margin-bottom: 4px;
 }
 
 .subtitle {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 15px;
 }
 
-.header-filters {
+/* Minimal Select */
+.select-container {
+  position: relative;
   display: flex;
-  gap: 16px;
+  align-items: center;
 }
 
-.filter-group label {
-  font-size: 11px;
-  text-transform: uppercase;
+.select-icon {
+  position: absolute;
+  left: 12px;
   color: var(--text-muted);
-  margin-bottom: 6px;
-  display: block;
+  pointer-events: none;
 }
 
-.filter-select {
-  width: 200px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border-subtle);
-}
-
-.library-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 24px;
-}
-
-.library-card {
+.minimal-select {
+  padding-left: 36px;
+  width: 220px;
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  padding: 24px;
+  border-radius: var(--radius-md);
+  appearance: none;
   cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
-.library-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--primary);
-  box-shadow: var(--shadow-lg);
+.minimal-select:hover {
   background: var(--bg-card-hover);
 }
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.card-title-group {
+.board-container {
   flex: 1;
-}
-
-.card-title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
-  line-height: 1.4;
-}
-
-.card-date {
-  font-size: 11px;
-  color: var(--text-muted);
-  display: block;
-  margin-top: 4px;
-}
-
-.card-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  margin: 0;
-}
-
-.card-footer {
-  margin-top: auto;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
 }
 
-.card-modules {
+.kanban-board {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 20px;
+  width: 100%;
+  padding-bottom: 8px;
 }
 
-.mini-tag {
-  background: var(--bg-input);
-  border: 1px solid var(--border-active);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 10px;
-  color: var(--text-secondary);
-}
-
-.loading-state, .empty-library {
-  padding: 100px;
-  text-align: center;
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  border: 1px dashed var(--border-subtle);
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid var(--border-active);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 1s infinite linear;
-  margin: 0 auto 16px;
-}
-
-.card-actions {
+.kanban-column {
+  flex: 1;
+  min-width: 300px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
   display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.btn-favorite {
-  color: var(--text-muted);
+  flex-direction: column;
+  max-height: 100%;
   transition: all 0.2s ease;
 }
 
-.btn-favorite:hover {
-  transform: scale(1.1);
-  color: var(--primary);
+.kanban-column.drag-over {
+  background: rgba(var(--primary-rgb, 99, 102, 241), 0.05);
+  border-color: var(--primary);
+  transform: scale(1.01);
 }
 
-.btn-favorite.is-favorite {
-  color: #ff4757;
+.column-header {
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.column-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.validated { background: var(--color-info); }
+.status-dot.written { background: var(--color-success); }
+.status-dot.published { background: var(--text-muted); }
+
+.column-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.count-badge {
+  background: var(--border-subtle);
+  color: var(--text-secondary);
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.column-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.scroll-y { overflow-y: auto; }
+.scroll-y::-webkit-scrollbar { width: 4px; }
+
+.btn-full { flex: 1; }
+.btn-square { width: 34px; padding: 0; flex-shrink: 0; }
+
+.btn-passer {
+  color: var(--primary);
+  background: rgba(var(--primary-rgb, 99, 102, 241), 0.08);
+  border: 1px solid rgba(var(--primary-rgb, 99, 102, 241), 0.3);
+  font-weight: 600;
+  margin-top: 4px;
+  padding: 8px 12px;
+  height: auto;
+  line-height: 1.2;
+}
+
+.btn-passer:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: var(--border-muted);
+}
+
+.empty-column {
+  padding: 40px 20px;
+  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-lg);
+  margin-top: 8px;
+}
+
+.empty-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.empty-column p {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.loader-sm {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-right: 10px;
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
 </style>

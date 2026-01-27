@@ -17,10 +17,10 @@
       <!-- Main Content Column -->
       <div class="main-column">
         <header class="article-header">
-           <NuxtLink to="/dashboard" class="back-link">
+           <a @click="goBack" class="back-link">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-            Retour au Dashboard
-          </NuxtLink>
+            Retour
+          </a>
            
            <div class="title-section">
              <h1 class="article-title">{{ article.original_title }}</h1>
@@ -53,7 +53,7 @@
           <div v-if="versions.length === 0" class="empty-state">
             <div class="empty-icon">✍️</div>
             <h4>Aucun contenu rédigé pour cet article</h4>
-            <p>Le contenu apparaîtra ici une fois la rédaction terminée.</p>
+            <p>Le contenu apparaîtra ici une fois la génération terminée.</p>
           </div>
 
           <div v-else class="content-editor">
@@ -114,10 +114,10 @@
           <div class="detail-group">
             <label>Modules activés</label>
             <div class="modules-list">
-              <span v-for="am in article.article_modules" :key="am.module.id" class="module-tag">
-                {{ am.module.name }}
+              <span v-for="am in articleModules" :key="am.id" class="module-tag">
+                {{ am.name }}
               </span>
-              <span v-if="!article.article_modules || article.article_modules.length === 0" class="text-muted text-sm">Aucun module</span>
+              <span v-if="articleModules.length === 0" class="text-muted text-sm">Aucun module</span>
             </div>
           </div>
         </div>
@@ -128,10 +128,13 @@
 
 <script setup lang="ts">
 import { format } from 'date-fns'
+import { useRouter } from 'vue-router';
+import type { Article } from '@/types/article';
 
 const route = useRoute()
 const client = useSupabaseClient()
-const articleId = route.params.id
+const router = useRouter();
+const articleId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
 
 // Fetch article and its versions in a single query
 const { data: article, pending, error } = await useAsyncData(`article-${articleId}`, async () => {
@@ -144,11 +147,11 @@ const { data: article, pending, error } = await useAsyncData(`article-${articleI
             ),
             article_versions (*)
         `)
-        .eq('id', articleId)
+        .eq('id', Number(articleId))
         .single()
     
     if (error) throw error
-    return data
+    return data as any
 })
 
 // Current selected version index (0 = most recent)
@@ -164,6 +167,11 @@ const versions = computed(() => {
 
 const latestVersion = computed(() => versions.value[selectedVersionIndex.value] || null)
 const currentContent = computed(() => latestVersion.value?.content || null)
+
+const articleModules = computed(() => {
+  if (!article.value?.article_modules) return []
+  return article.value.article_modules.map((am: any) => am.module)
+})
 
 const editedContent = ref('')
 const showCopySuccess = ref(false)
@@ -196,6 +204,10 @@ const copyContent = () => {
         }, 2000)
     }
 }
+
+const goBack = () => {
+  router.back();
+};
 </script>
 
 <style scoped>
@@ -226,6 +238,7 @@ const copyContent = () => {
   margin-bottom: 24px;
   transition: color 0.2s;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .back-link:hover {
