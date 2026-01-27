@@ -19,7 +19,7 @@
             @input="generateSlug"
           />
         </div>
-        <div class="form-group">
+        <div class="form-group text-center">
           <label>Slug (Auto)</label>
           <input 
             v-model="newModule.slug" 
@@ -46,6 +46,18 @@
           </button>
         </div>
       </div>
+      <div class="form-group full-width mt-20">
+        <label class="ai-label">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12L2.69 7"></path><path d="M12 12l5.63 8.35"></path></svg>
+          Description (Instructions IA)
+        </label>
+        <textarea 
+          v-model="newModule.description" 
+          placeholder="Décris ce que l'article doit aborder lorsque ce module est sélectionné..."
+          rows="3"
+        ></textarea>
+        <p class="help-text">Décris ce que l’article doit aborder lorsque ce module est sélectionné.</p>
+      </div>
     </div>
 
     <div class="list-section">
@@ -56,6 +68,7 @@
           <thead>
             <tr>
               <th>Nom</th>
+              <th>Description</th>
               <th>Slug</th>
               <th>Statut</th>
               <th style="text-align: right;">Actions</th>
@@ -63,11 +76,16 @@
           </thead>
           <tbody>
             <tr v-if="modules.length === 0">
-              <td colspan="4" class="empty-row">Aucun module trouvé.</td>
+              <td colspan="5" class="empty-row">Aucun module trouvé.</td>
             </tr>
             <tr v-for="mod in modules" :key="mod.id" class="module-row">
               <td>
                 <span class="module-name">{{ mod.name }}</span>
+              </td>
+              <td>
+                <span class="module-description" :title="mod.description">
+                  {{ mod.description || 'Aucune description' }}
+                </span>
               </td>
               <td>
                 <code class="slug-badge">{{ mod.slug }}</code>
@@ -83,13 +101,22 @@
                 </button>
               </td>
               <td class="text-right">
-                <button 
-                  class="btn btn-ghost btn-sm btn-square text-danger"
-                  @click="deleteModule(mod.id)"
-                  title="Supprimer"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+                <div class="actions-group">
+                  <button 
+                    class="btn btn-ghost btn-sm btn-square"
+                    @click="openEditModal(mod)"
+                    title="Modifier"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button 
+                    class="btn btn-ghost btn-sm btn-square text-danger"
+                    @click="deleteModule(mod.id)"
+                    title="Supprimer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -106,6 +133,50 @@
       @cancel="closeConfirm"
       @confirm="handleDelete"
     />
+
+    <!-- Edit Modal -->
+    <div v-if="isEditModalOpen" class="modal-overlay" @click.self="closeEditModal">
+      <div class="modal-content glass-panel edit-modal">
+        <header class="modal-header">
+          <h3>Modifier le Module</h3>
+          <button class="close-btn" @click="closeEditModal">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </header>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nom du module</label>
+            <input v-model="editingModule.name" type="text" />
+          </div>
+
+          <div class="form-group mt-20">
+            <label class="ai-label">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ai-icon"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12L2.69 7"></path><path d="M12 12l5.63 8.35"></path></svg>
+              Description (Instructions IA)
+            </label>
+            <textarea v-model="editingModule.description" rows="5"></textarea>
+            <p class="help-text">Décris ce que l’article doit aborder lorsque ce module est sélectionné.</p>
+          </div>
+
+          <div class="form-group mt-20">
+            <label class="checkbox-container">
+              <input type="checkbox" v-model="editingModule.active">
+              <span class="checkmark"></span>
+              <span class="label-text">Module actif</span>
+            </label>
+          </div>
+        </div>
+
+        <footer class="modal-footer">
+          <button class="btn btn-ghost" @click="closeEditModal">Annuler</button>
+          <button class="btn btn-primary" @click="handleUpdate" :disabled="updating">
+            <div v-if="updating" class="loader-sm"></div>
+            <span>{{ updating ? 'Enregistrement...' : 'Enregistrer' }}</span>
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -119,6 +190,7 @@ interface Module {
   id: number
   name: string
   slug: string
+  description?: string
   active: boolean
   created_at?: string
 }
@@ -126,10 +198,12 @@ interface Module {
 const modules = ref<Module[]>([])
 const loading = ref(true)
 const creating = ref(false)
+const updating = ref(false)
 
 const newModule = ref({
   name: '',
   slug: '',
+  description: '',
   active: true
 })
 
@@ -163,13 +237,14 @@ const createModule = async () => {
     .insert({
       name: newModule.value.name,
       slug: newModule.value.slug,
+      description: newModule.value.description,
       active: newModule.value.active
     } as any)
   
   if (error) {
     console.error('Error creating module:', error)
   } else {
-    newModule.value = { name: '', slug: '', active: true }
+    newModule.value = { name: '', slug: '', description: '', active: true }
     fetchModules()
   }
   creating.value = false
@@ -218,6 +293,44 @@ const handleDelete = async () => {
     modules.value = modules.value.filter(m => m.id !== moduleIdToDelete.value)
     closeConfirm()
   }
+}
+
+// Edit Modal Logic
+const isEditModalOpen = ref(false)
+const editingModule = ref<Partial<Module>>({})
+
+const openEditModal = (mod: Module) => {
+  editingModule.value = { ...mod }
+  isEditModalOpen.value = true
+}
+
+const closeEditModal = () => {
+  isEditModalOpen.value = false
+  editingModule.value = {}
+}
+
+const handleUpdate = async () => {
+  if (!editingModule.value.id || !editingModule.value.name) return
+  updating.value = true
+
+  const { error } = await (client.from('modules') as any)
+    .update({
+      name: editingModule.value.name,
+      description: editingModule.value.description,
+      active: editingModule.value.active
+    })
+    .eq('id', editingModule.value.id)
+
+  if (error) {
+    console.error('Error updating module:', error)
+  } else {
+    const idx = modules.value.findIndex(m => m.id === editingModule.value.id)
+    if (idx !== -1) {
+      modules.value[idx] = { ...modules.value[idx], ...editingModule.value } as Module
+    }
+    closeEditModal()
+  }
+  updating.value = false
 }
 
 onMounted(() => {
@@ -365,6 +478,17 @@ onMounted(() => {
 .module-name {
   font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.module-description {
+  color: var(--text-muted);
+  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 300px;
 }
 
 .slug-badge {
@@ -426,9 +550,104 @@ onMounted(() => {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Utilities */
+.mt-20 { margin-top: 20px; }
+.full-width { grid-column: 1 / -1; }
+
+.ai-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-light);
+  font-weight: 600 !important;
+  margin-bottom: 8px !important;
+}
+
+.ai-icon {
+  color: var(--primary);
+}
+
+.help-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.actions-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.edit-modal {
+  width: 90%;
+  max-width: 500px;
+  padding: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.01);
+}
+
 @media (max-width: 800px) {
   .form-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
   }
 }
 </style>
