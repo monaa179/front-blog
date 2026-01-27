@@ -1,21 +1,8 @@
-export default defineNuxtRouteMiddleware(async (to, from) => {
-    const user = useSupabaseUser()
-    const client = useSupabaseClient()
+export default defineNuxtRouteMiddleware((to, from) => {
+    const { user } = useAuth()
 
-    // If not logged in, redirect to login
-    if (!user.value) {
-        return navigateTo('/login')
-    }
-
-    // Fetch user profile to check role
-    const { data: profile, error } = await client
-        .from('profiles')
-        .select('role')
-        .eq('id', user.value.id)
-        .single() as { data: { role: string } | null, error: any }
-
-    // If no profile or not an admin, redirect to dashboard
-    if (error || !profile || profile.role !== 'admin') {
+    // If no user or not an admin, redirect to dashboard
+    if (!user.value || user.value.role !== 'admin') {
         return navigateTo('/dashboard')
     }
 })

@@ -132,26 +132,12 @@ import { useRouter } from 'vue-router';
 import type { Article } from '@/types/article';
 
 const route = useRoute()
-const client = useSupabaseClient()
 const router = useRouter();
 const articleId = Array.isArray(route.params.id) ? route.params.id[0] : route.params.id
 
 // Fetch article and its versions in a single query
 const { data: article, pending, error } = await useAsyncData(`article-${articleId}`, async () => {
-    const { data, error } = await client
-        .from('articles')
-        .select(`
-            *,
-            article_modules (
-                module:modules (*)
-            ),
-            article_versions (*)
-        `)
-        .eq('id', Number(articleId))
-        .single()
-    
-    if (error) throw error
-    return data as any
+    return await $fetch<any>(`/api/articles/${articleId}`)
 })
 
 // Current selected version index (0 = most recent)

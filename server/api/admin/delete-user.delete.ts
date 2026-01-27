@@ -1,41 +1,27 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
-
 export default defineEventHandler(async (event) => {
-    const user = await serverSupabaseUser(event)
-    const client = serverSupabaseServiceRole(event)
+    // Current user must be admin
+    const session = getCookie(event, 'auth_session')
+    if (!session) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 
-    if (!user) {
-        throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-    }
-
-    // Check if current user is admin
-    const { data: currentUserProfile } = await client
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single() as { data: { role: string } | null }
-
-    if (currentUserProfile?.role !== 'admin') {
+    const { role: currentUserRole, id: currentUserId } = JSON.parse(session)
+    if (currentUserRole !== 'admin') {
         throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
     }
 
     const query = getQuery(event)
-    const userId = query.id as string
+    const id = query.id as string
 
-    if (!userId) {
-        throw createError({ statusCode: 400, statusMessage: 'Missing user ID' })
+    if (!id) {
+        throw createError({ statusCode: 400, statusMessage: 'ID is required' })
     }
 
-    if (userId === user.id) {
-        throw createError({ statusCode: 400, statusMessage: 'Cannot delete your own account' })
+    if (id === currentUserId) {
+        throw createError({ statusCode: 400, statusMessage: 'Cannot delete yourself' })
     }
 
-    // Delete user from auth (this will cascade to profiles if RLS/Foreign Key is set to cascade)
-    const { error } = await client.auth.admin.deleteUser(userId)
-
-    if (error) {
-        throw createError({ statusCode: 400, statusMessage: error.message })
-    }
+    await prisma.profile.delete({
+        where: { id }
+    })
 
     return { success: true }
 })

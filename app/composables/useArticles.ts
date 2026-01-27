@@ -11,8 +11,6 @@ import type { Article, Module } from '@/types/article'
 export const useArticles = (
   options: { statuses?: string[]; order?: { column: string; ascending: boolean } } = {}
 ) => {
-  const client = useSupabaseClient()
-
   const articles = ref<Article[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -26,52 +24,20 @@ export const useArticles = (
     error.value = null
 
     try {
-      const query = client
-        .from('articles')
-        .select(`
-          *,
-          article_modules (
-            module:modules (*)
-          ),
-          article_versions (
-            content,
-            created_at
-          )
-        `)
-
+      const query: any = {}
       if (options.statuses && options.statuses.length > 0) {
-        query.in('status', options.statuses)
+        query.statuses = options.statuses
+      }
+      if (options.order) {
+        query.orderCol = options.order.column
+        query.ascending = String(options.order.ascending)
       }
 
-      const orderCol = options.order?.column || 'created_at'
-      const ascending = !!options.order?.ascending
-
-      const { data, error: err } = await query.order(orderCol, { ascending })
-      if (err) throw err
-
-      articles.value = (data as any[]).map(article => {
-        const versions = article.article_versions || []
-        const lastVersion = versions.length
-          ? versions.sort(
-            (a: any, b: any) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          )[0]
-          : null
-
-        return {
-          ...article,
-          modules: article.article_modules
-            ? article.article_modules.map((am: any) => am.module)
-            : [],
-          last_version_content: lastVersion?.content || null,
-          last_version_at: lastVersion?.created_at || article.created_at,
-          last_version_created_at: lastVersion?.created_at || article.created_at,
-          versions_count: versions.length || 0
-        }
-      })
+      const data = await $fetch<any[]>('/api/articles', { query })
+      articles.value = data
     } catch (err: any) {
       console.error('[useArticles] fetch error', err)
-      error.value = err?.message || 'Failed to fetch articles'
+      error.value = err?.data?.statusMessage || err?.message || 'Failed to fetch articles'
     } finally {
       loading.value = false
     }
@@ -81,68 +47,69 @@ export const useArticles = (
      SHARED ACTIONS
   =========================== */
   const deleteArticle = async (id: number) => {
-    const { error: err } = await client.from('articles').delete().eq('id', id)
-    if (err) {
+    try {
+      await $fetch(`/api/articles/${id}`, { method: 'DELETE' })
+      articles.value = articles.value.filter(a => a.id !== id)
+      return true
+    } catch (err) {
       console.error('[useArticles] delete error', err)
       return false
     }
-    articles.value = articles.value.filter(a => a.id !== id)
-    return true
   }
 
   const archiveArticle = async (id: number) => {
-    const { error: err } = await (client.from('articles') as any).update({ status: 'abandoned' }).eq('id', id)
-    if (err) {
+    try {
+      await $fetch(`/api/articles/${id}`, {
+        method: 'PATCH',
+        body: { status: 'abandoned' }
+      })
+      articles.value = articles.value.filter(a => a.id !== id)
+      return true
+    } catch (err) {
       console.error('[useArticles] archive error', err)
       return false
     }
-    articles.value = articles.value.filter(a => a.id !== id)
-    return true
   }
 
   const updateStatus = async (id: number, newStatus: string) => {
-    const { error: err } = await (client.from('articles') as any).update({ status: newStatus }).eq('id', id)
-    if (err) {
+    try {
+      await $fetch(`/api/articles/${id}`, {
+        method: 'PATCH',
+        body: { status: newStatus }
+      })
+      const article = articles.value.find(a => a.id === id)
+      if (article) article.status = newStatus
+      return true
+    } catch (err) {
       console.error('[useArticles] updateStatus error', err)
       return false
     }
-    const article = articles.value.find(a => a.id === id)
-    if (article) article.status = newStatus
-    return true
   }
 
   const fetchModules = async () => {
-    const { data, error: err } = await client.from('modules').select('*').eq('active', true)
-    if (err) {
+    try {
+      const data = await $fetch<Module[]>('/api/modules', {
+        query: { active: 'true' }
+      })
+      allModules.value = data || []
+    } catch (err) {
       console.error('[useArticles] fetchModules error', err)
-      return
     }
-    allModules.value = data || []
   }
 
   const updateModules = async (articleId: number, newModules: Module[]) => {
-    const { error: deleteErr } = await client.from('article_modules').delete().eq('article_id', articleId)
-    if (deleteErr) {
-      console.error('[useArticles] updateModules delete error', deleteErr)
+    try {
+      await $fetch(`/api/articles/${articleId}`, {
+        method: 'PATCH',
+        body: { modules: newModules }
+      })
+      const article = articles.value.find(a => a.id === articleId)
+      if (article) article.modules = newModules
+      return true
+    } catch (err) {
+      console.error('[useArticles] updateModules error', err)
       return false
     }
-
-    if (newModules.length > 0) {
-      const insertData = newModules.map(m => ({
-        article_id: articleId,
-        module_id: m.id
-      }))
-
-      const { error: insertErr } = await client.from('article_modules').insert(insertData as any)
-      if (insertErr) {
-        console.error('[useArticles] updateModules insert error', insertErr)
-        return false
-      }
-    }
-
-    const article = articles.value.find(a => a.id === articleId)
-    if (article) article.modules = newModules
-    return true
   }
 
   /* ===========================
@@ -158,30 +125,14 @@ export const useArticles = (
     }
 
     try {
-      const { data, error } = await client
-        .from('articles')
-        .select('status')
-
-      if (error) throw error
+      // We could create a specific stats endpoint, 
+      // but for now we'll just fetch all and count or fetch a summary
+      const data = await $fetch<any[]>('/api/articles')
 
       data.forEach(article => {
-        const status = (article as any).status?.toLowerCase()
-        switch (status) {
-          case 'proposed':
-            stats.proposed++
-            break
-          case 'written':
-            stats.written++
-            break
-          case 'validated':
-            stats.validated++
-            break
-          case 'published':
-            stats.published++
-            break
-          case 'abandoned':
-            stats.abandoned++
-            break
+        const status = article.status?.toLowerCase()
+        if (status in stats) {
+          (stats as any)[status]++
         }
       })
     } catch (err) {

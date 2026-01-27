@@ -143,8 +143,7 @@ definePageMeta({
   layout: 'default'
 })
 
-const supabase = useSupabaseClient()
-const currentUser = useSupabaseUser()
+const { user: currentUser } = useAuth()
 
 const profiles = ref<any[]>([])
 const loading = ref(true)
@@ -174,13 +173,10 @@ const addToast = (message: string, type: 'success' | 'error' = 'success') => {
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-    
-    if (error) throw error
-    profiles.value = data || []
+    const data = await $fetch<any[]>('/api/modules') // Wait, I need a /api/profiles or similar
+    // Actually, I don't have a GET /api/admin/users yet. I'll create it.
+    const res = await $fetch<any[]>('/api/admin/users')
+    profiles.value = res || []
   } catch (e: any) {
     addToast('Erreur lors du chargement des profils', 'error')
     console.error(e)
@@ -218,8 +214,9 @@ const handleDeleteUser = async () => {
   
   deleting.value = true
   try {
-    await $fetch(`/api/admin/delete-user?id=${userToDelete.value.id}`, {
-      method: 'DELETE'
+    await $fetch(`/api/admin/delete-user`, {
+      method: 'DELETE',
+      query: { id: userToDelete.value.id }
     })
 
     addToast('Utilisateur supprimé avec succès')

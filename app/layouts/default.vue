@@ -63,17 +63,10 @@
 </template>
 
 <script setup lang="ts">
-const client = useSupabaseClient()
-const user = useSupabaseUser()
-const router = useRouter()
+const { user, logout } = useAuth()
 
 const handleLogout = async () => {
-  const { error } = await client.auth.signOut()
-  if (error) {
-    console.error('Logout error:', error)
-  } else {
-    router.push('/login')
-  }
+  await logout()
 }
 </script>
 

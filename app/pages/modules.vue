@@ -184,7 +184,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 
-const client = useSupabaseClient()
+const router = useRouter()
 
 interface Module {
   id: number
@@ -217,49 +217,51 @@ const generateSlug = () => {
 
 const fetchModules = async () => {
   loading.value = true
-  const { data, error } = await client
-    .from('modules')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
-  if (error) console.error('Error fetching modules:', error)
-  else modules.value = (data as Module[]) || []
-  
-  loading.value = false
+  try {
+    const data = await $fetch<Module[]>('/api/modules')
+    modules.value = data || []
+  } catch (error) {
+    console.error('Error fetching modules:', error)
+  } finally {
+    loading.value = false
+  }
 }
 
 const createModule = async () => {
   if (!newModule.value.name) return
   creating.value = true
   
-  const { error } = await client
-    .from('modules')
-    .insert({
-      name: newModule.value.name,
-      slug: newModule.value.slug,
-      description: newModule.value.description,
-      active: newModule.value.active
-    } as any)
-  
-  if (error) {
-    console.error('Error creating module:', error)
-  } else {
+  try {
+    await $fetch('/api/modules', {
+      method: 'POST',
+      body: {
+        name: newModule.value.name,
+        slug: newModule.value.slug,
+        description: newModule.value.description,
+        active: newModule.value.active
+      }
+    })
     newModule.value = { name: '', slug: '', description: '', active: true }
     fetchModules()
+  } catch (error) {
+    console.error('Error creating module:', error)
+  } finally {
+    creating.value = false
   }
-  creating.value = false
 }
 
 const toggleActive = async (mod: Module) => {
   const newVal = !mod.active
+  const oldVal = mod.active
   mod.active = newVal
   
-  const { error } = await (client.from('modules') as any)
-    .update({ active: newVal })
-    .eq('id', mod.id)
-    
-  if (error) {
-    mod.active = !newVal // revert
+  try {
+    await $fetch(`/api/modules/${mod.id}`, {
+      method: 'PATCH',
+      body: { active: newVal }
+    })
+  } catch (error) {
+    mod.active = oldVal // revert
     console.error('Error updating module:', error)
   }
 }
@@ -284,14 +286,14 @@ const handleDelete = async () => {
   if (!moduleIdToDelete.value) return
   actionLoading.value = true
   
-  const { error } = await client.from('modules').delete().eq('id', moduleIdToDelete.value)
-  
-  if (error) {
-    console.error('Error deleting module:', error)
-    actionLoading.value = false
-  } else {
+  try {
+    await $fetch(`/api/modules/${moduleIdToDelete.value}`, { method: 'DELETE' })
     modules.value = modules.value.filter(m => m.id !== moduleIdToDelete.value)
     closeConfirm()
+  } catch (error) {
+    console.error('Error deleting module:', error)
+  } finally {
+    actionLoading.value = false
   }
 }
 
@@ -313,24 +315,25 @@ const handleUpdate = async () => {
   if (!editingModule.value.id || !editingModule.value.name) return
   updating.value = true
 
-  const { error } = await (client.from('modules') as any)
-    .update({
-      name: editingModule.value.name,
-      description: editingModule.value.description,
-      active: editingModule.value.active
+  try {
+    const updated = await $fetch<Module>(`/api/modules/${editingModule.value.id}`, {
+      method: 'PATCH',
+      body: {
+        name: editingModule.value.name,
+        description: editingModule.value.description,
+        active: editingModule.value.active
+      }
     })
-    .eq('id', editingModule.value.id)
-
-  if (error) {
-    console.error('Error updating module:', error)
-  } else {
     const idx = modules.value.findIndex(m => m.id === editingModule.value.id)
     if (idx !== -1) {
-      modules.value[idx] = { ...modules.value[idx], ...editingModule.value } as Module
+      modules.value[idx] = { ...modules.value[idx], ...updated }
     }
     closeEditModal()
+  } catch (error) {
+    console.error('Error updating module:', error)
+  } finally {
+    updating.value = false
   }
-  updating.value = false
 }
 
 onMounted(() => {

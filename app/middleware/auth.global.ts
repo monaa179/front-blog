@@ -1,5 +1,5 @@
 export default defineNuxtRouteMiddleware((to, from) => {
-    const user = useSupabaseUser()
+    const { user } = useAuth()
 
     // If user is logged in and trying to access login page, redirect to dashboard
     if (user.value && to.path === '/login') {

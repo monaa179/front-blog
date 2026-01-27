@@ -1,0 +1,89 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model Profile {
+  id         String   @id @default(uuid())
+  email      String   @unique
+  password   String? // Store hashed password
+  role       String   @default("user")
+  first_name String?
+  last_name  String?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  articles   Article[]
+
+  @@map("profiles")
+}
+
+model Article {
+  id                   BigInt            @id @default(autoincrement())
+  source_url           String?           @db.Text
+  original_title       String            @db.Text
+  original_description String            @db.Text
+  suggested_title      String?           @db.Text
+  suggested_description String?          @db.Text
+  score                Int?
+  status               String            @default("draft")
+  created_at           DateTime          @default(now())
+  updated_at           DateTime          @updatedAt
+  author_id            String?
+  author               Profile?          @relation(fields: [author_id], references: [id])
+  modules              ArticleModule[]
+  versions             ArticleVersion[]
+  favorites            ArticleFavorite[]
+
+  @@map("articles")
+}
+
+model Module {
+  id          BigInt          @id @default(autoincrement())
+  name        String          @db.Text
+  slug        String          @unique
+  active      Boolean         @default(true)
+  created_at  DateTime        @default(now())
+  description String?         @db.Text
+  articles    ArticleModule[]
+
+  @@map("modules")
+}
+
+model ArticleModule {
+  article_id BigInt
+  module_id  BigInt
+  article    Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  module     Module  @relation(fields: [module_id], references: [id], onDelete: Cascade)
+
+  @@id([article_id, module_id])
+  @@map("article_modules")
+}
+
+model ArticleVersion {
+  id             BigInt   @id @default(autoincrement())
+  article_id     BigInt
+  content        String?  @db.LongText
+  version_number Int      @default(1)
+  created_at     DateTime @default(now())
+  article        Article  @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  @@map("article_versions")
+}
+
+model ArticleFavorite {
+  user_id    String
+  article_id BigInt
+  article    Article @relation(fields: [article_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, article_id])
+  @@map("article_favorites")
+}

@@ -1,21 +1,12 @@
-import { serverSupabaseServiceRole, serverSupabaseUser } from '#supabase/server'
+import { hash } from 'bcryptjs'
 
 export default defineEventHandler(async (event) => {
-    const user = await serverSupabaseUser(event)
-    const client = serverSupabaseServiceRole(event)
+    // Current user must be admin
+    const session = getCookie(event, 'auth_session')
+    if (!session) throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
 
-    if (!user) {
-        throw createError({ statusCode: 401, statusMessage: 'Unauthorized' })
-    }
-
-    // Check if current user is admin
-    const { data: currentUserProfile } = await client
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single() as { data: { role: string } | null }
-
-    if (currentUserProfile?.role !== 'admin') {
+    const { role: currentUserRole } = JSON.parse(session)
+    if (currentUserRole !== 'admin') {
         throw createError({ statusCode: 403, statusMessage: 'Forbidden' })
     }
 
@@ -26,38 +17,22 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 400, statusMessage: 'Missing required fields' })
     }
 
-    // 1. Create user in Supabase Auth
-    const { data: authData, error: authError } = await client.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { first_name, last_name }
-    })
-
-    if (authError) {
-        throw createError({ statusCode: 400, statusMessage: authError.message })
+    const existingUser = await prisma.profile.findUnique({ where: { email } })
+    if (existingUser) {
+        throw createError({ statusCode: 400, statusMessage: 'User already exists' })
     }
 
-    if (!authData.user) {
-        throw createError({ statusCode: 500, statusMessage: 'User creation failed' })
-    }
+    const hashedPassword = await hash(password, 10)
 
-    // 2. Create profile entry
-    const { error: profileError } = await client
-        .from('profiles')
-        .insert({
-            id: authData.user.id,
+    const newUser = await prisma.profile.create({
+        data: {
             email,
+            password: hashedPassword,
             first_name,
             last_name,
             role
-        } as any)
+        }
+    })
 
-    if (profileError) {
-        // Cleanup auth user if profile creation fails
-        await client.auth.admin.deleteUser(authData.user.id)
-        throw createError({ statusCode: 400, statusMessage: profileError.message })
-    }
-
-    return { success: true, user: authData.user }
+    return { success: true, user: { id: newUser.id, email: newUser.email } }
 })

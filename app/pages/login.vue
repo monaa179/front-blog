@@ -48,8 +48,8 @@
 definePageMeta({
   layout: 'auth'
 })
-const supabase = useSupabaseClient()
-const router = useRouter() // Use router for client-side navigation after login
+const { login } = useAuth()
+const router = useRouter()
 
 const email = ref('')
 const password = ref('')
@@ -61,18 +61,16 @@ const handleLogin = async () => {
     loading.value = true
     error.value = null
     
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: email.value,
-      password: password.value
-    })
+    const res = await login({ email: email.value, password: password.value })
 
-    if (authError) throw authError
-
-    // Successful login
-    router.push('/dashboard')
+    if (res.success) {
+      router.push('/dashboard')
+    } else {
+      error.value = res.error
+    }
     
   } catch (e) {
-    error.value = e.message
+    error.value = e.data?.statusMessage || e.message || 'Login failed'
   } finally {
     loading.value = false
   }

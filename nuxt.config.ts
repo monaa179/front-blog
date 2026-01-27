@@ -3,16 +3,11 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   modules: [
-    '@nuxtjs/supabase'
   ],
 
   css: [
     '~/assets/css/base.css'
   ],
-
-  supabase: {
-    redirect: false // We will handle this with our own middleware
-  },
 
   runtimeConfig: {
     public: {

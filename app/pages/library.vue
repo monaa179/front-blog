@@ -121,7 +121,6 @@ import LoadingState from '@/components/LoadingState.vue'
 import ArticleCard from '@/components/ArticleCard.vue'
 import ConfirmModal from '@/components/ConfirmModal.vue'
 
-const client = useSupabaseClient()
 const router = useRouter()
 
 const selectedModuleId = ref<number | null>(null)
@@ -195,8 +194,11 @@ const copyContent = (article: Article) => {
 const handleWrite = async (article: Article) => {
   processingId.value = article.id
   try {
-    const { data: vData } = await client.from('article_versions').insert({ article_id: article.id, content: null } as any).select('*')
-    const versionId = (vData as any)?.[0]?.id
+    const vData = await $fetch<{id: number}>(`/api/articles/${article.id}/versions`, {
+      method: 'POST',
+      body: { content: null }
+    })
+    const versionId = vData.id
 
     const makeWebhook = 'https://hook.eu2.make.com/fa1xbhnay548sl6gu5zt8amx9jecv77q'
     const res = await fetch(makeWebhook, {
