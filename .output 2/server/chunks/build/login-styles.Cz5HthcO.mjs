@@ -1,0 +1,8 @@
+const login_vue_vue_type_style_index_0_scoped_e73132d2_lang = ".login-container[data-v-e73132d2]{align-items:center;background-color:var(--bg-dark);display:flex;justify-content:center;min-height:100vh}.login-card[data-v-e73132d2]{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);box-shadow:0 4px 6px -1px #0000001a,0 2px 4px -1px #0000000f;max-width:400px;padding:40px;width:100%}.logo[data-v-e73132d2]{margin-bottom:32px;text-align:center}.brand[data-v-e73132d2]{color:var(--text-primary);font-size:24px;margin-bottom:8px}.subtitle[data-v-e73132d2]{color:var(--text-secondary);font-size:14px}.form-group[data-v-e73132d2]{margin-bottom:20px}.full-width[data-v-e73132d2]{margin-top:8px;width:100%}.error-message[data-v-e73132d2]{background-color:#ef44441a;border-radius:var(--radius-sm);color:var(--color-error);font-size:13px;margin-bottom:16px;padding:8px;text-align:center}";
+
+const loginStyles_Cz5HthcO = [
+  login_vue_vue_type_style_index_0_scoped_e73132d2_lang
+];
+
+export { loginStyles_Cz5HthcO as default };
+//# sourceMappingURL=login-styles.Cz5HthcO.mjs.map

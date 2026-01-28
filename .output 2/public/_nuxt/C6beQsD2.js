@@ -1,0 +1,1 @@
+import{_ as t,o,c as s,E as a}from"./C_A17Xze.js";const c={},n={class:"auth-layout"};function d(e,r){return o(),s("div",n,[a(e.$slots,"default",{},void 0)])}const f=t(c,[["render",d],["__scopeId","data-v-de31fdc4"]]);export{f as default};

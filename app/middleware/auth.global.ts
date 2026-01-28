@@ -1,6 +1,11 @@
 export default defineNuxtRouteMiddleware((to, from) => {
     const { user } = useAuth()
 
+    // Skip authentication for API routes (called by external services like Make.com)
+    if (to.path.startsWith('/api/')) {
+        return
+    }
+
     // If user is logged in and trying to access login page, redirect to dashboard
     if (user.value && to.path === '/login') {
         return navigateTo('/dashboard')
