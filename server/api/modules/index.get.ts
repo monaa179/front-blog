@@ -1,3 +1,5 @@
+// serializeBigInt is auto-imported from server/utils by Nitro
+
 export default defineEventHandler(async (event) => {
     const query = getQuery(event)
     const onlyActive = query.active === 'true'
@@ -6,8 +8,6 @@ export default defineEventHandler(async (event) => {
         where: onlyActive ? { active: true } : {}
     })
 
-    return modules.map(m => ({
-        ...m,
-        id: Number(m.id)
-    }))
+    return serializeBigInt(modules)
 })
+

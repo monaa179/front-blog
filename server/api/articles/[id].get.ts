@@ -1,3 +1,5 @@
+// serializeBigInt is auto-imported from server/utils by Nitro
+
 export default defineEventHandler(async (event) => {
     const id = getRouterParam(event, 'id')
     if (!id) throw createError({ statusCode: 400, statusMessage: 'ID is required' })
@@ -20,17 +22,13 @@ export default defineEventHandler(async (event) => {
 
     if (!article) throw createError({ statusCode: 404, statusMessage: 'Article not found' })
 
-    return {
+    return serializeBigInt({
         ...article,
-        id: Number(article.id),
-        modules: article.modules.map(am => ({
-            ...am.module,
-            id: Number(am.module.id)
+        article_modules: article.modules.map(am => ({
+            ...am,
+            module: am.module
         })),
-        versions: article.versions.map(v => ({
-            ...v,
-            id: Number(v.id),
-            article_id: Number(v.article_id)
-        }))
-    }
+        article_versions: article.versions
+    })
 })
+

@@ -231,7 +231,9 @@ const handleDeleteUser = async () => {
 
 const formatDate = (dateString: string) => {
   if (!dateString) return 'n/a'
-  return format(new Date(dateString), 'd MMM yyyy, HH:mm', { locale: fr })
+  const parsedDate = new Date(dateString)
+  if (isNaN(parsedDate.getTime())) return 'n/a'
+  return format(parsedDate, 'd MMM yyyy, HH:mm', { locale: fr })
 }
 
 onMounted(() => {

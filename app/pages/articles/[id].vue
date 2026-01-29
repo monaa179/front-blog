@@ -178,7 +178,9 @@ watch(currentContent, (newVal) => {
 
 const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '-'
-    return format(new Date(dateStr), 'dd/MM/yyyy HH:mm')
+    const parsedDate = new Date(dateStr)
+    if (isNaN(parsedDate.getTime())) return '-'
+    return format(parsedDate, 'dd/MM/yyyy HH:mm')
 }
 
 const copyContent = () => {

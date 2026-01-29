@@ -3,6 +3,13 @@ export default defineEventHandler(async (event) => {
     if (!id) throw createError({ statusCode: 400, statusMessage: 'ID is required' })
 
     const body = await readBody(event)
+
+    // 🔍 DEBUG LOGGING
+    console.log('📥 VERSIONS POST - Article ID:', id)
+    console.log('📥 VERSIONS POST - Raw body:', JSON.stringify(body))
+    console.log('📥 VERSIONS POST - Content received:', body?.content ? `${String(body.content).substring(0, 100)}...` : 'NULL/EMPTY')
+    console.log('📥 VERSIONS POST - Body keys:', Object.keys(body || {}))
+
     const { content } = body
 
     const lastVersion = await prisma.articleVersion.findFirst({

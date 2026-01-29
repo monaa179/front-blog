@@ -290,9 +290,21 @@ const handleDeleteDefinitely = async () => {
   }
 }
 
+// Refresh articles when page becomes visible (after switching from Dashboard)
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    fetchLibraryArticles()
+  }
+}
+
 onMounted(() => {
   fetchModules()
   fetchLibraryArticles()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 

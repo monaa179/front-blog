@@ -1,3 +1,5 @@
+// serializeBigInt is auto-imported from server/utils by Nitro
+
 export default defineEventHandler(async (event) => {
     const query = getQuery(event)
     const statuses = query.statuses as string[] | string
@@ -32,12 +34,11 @@ export default defineEventHandler(async (event) => {
     })
 
     // Format response to match what the frontend expects
-    return articles.map(article => ({
+    // Use serializeBigInt to convert all BigInt values to Number (fixes MariaDB serialization)
+    return articles.map(article => serializeBigInt({
         ...article,
-        id: Number(article.id), // Convert BigInt to Number
         modules: article.modules.map(am => ({
-            ...am.module,
-            id: Number(am.module.id)
+            ...am.module
         })),
         last_version_content: article.versions[0]?.content || null,
         last_version_at: article.versions[0]?.created_at || article.created_at,
@@ -45,3 +46,4 @@ export default defineEventHandler(async (event) => {
         versions_count: article._count.versions
     }))
 })
+
